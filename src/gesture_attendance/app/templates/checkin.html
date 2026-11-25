@@ -3,56 +3,77 @@
 {% block head %}
 <script src="/static/camera.js"></script>
 <style>
-  main { max-width:520px; padding-top:16px; }
-  .steps { display:flex; gap:6px; margin:0 0 16px; list-style:none; padding:0; }
-  .steps li { flex:1; text-align:center; font-size:.85rem; color:var(--muted); padding-top:8px; border-top:4px solid var(--line); }
-  .steps li.on { color:var(--board); border-color:var(--chalk-yellow); font-weight:700; }
-  .steps li.done { color:var(--ok); border-color:var(--ok); }
-  .checkin-head { padding:16px 18px; margin:0 0 14px; }
-  .checkin-head h1 { margin:2px 0 0; color:var(--chalk-yellow); }
-  .sign { text-align:center; margin:4px 0 12px; padding:14px; }
-  .sign .name { color:var(--chalk-yellow); }
-  .sign .emoji { font-size:5rem; line-height:1.1; }
-  .sign .name { font-size:1.5rem; font-weight:800; }
-  .videobox { position:relative; width:100%; aspect-ratio:3/4; background:#0b0f14; border-radius:var(--radius); overflow:hidden; }
+  main { max-width:520px; padding-top:0; }
+  .checkin-head { padding:22px 20px 26px; margin:0 -16px 18px; border-radius:0 0 26px 26px; text-align:center; }
+  .checkin-head .muted { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .checkin-head h1 { margin:6px 0 0; color:var(--chalk-yellow); font-size:1.6rem; }
+  @media (min-width:560px) { .checkin-head { margin:16px 0 18px; border-radius:22px; } }
+  .steps { display:flex; align-items:flex-start; margin:0 6px 18px; list-style:none; padding:0; }
+  .steps li { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:.8rem; font-weight:700; color:var(--muted); position:relative; }
+  .steps li::before { content:attr(data-n); width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+                      background:#ECE6D6; color:var(--muted); font-weight:800; z-index:1; transition:background .2s, color .2s; }
+  .steps li + li::after { content:""; position:absolute; top:16px; right:50%; width:100%; height:3px; background:#ECE6D6; z-index:0; }
+  .steps li.on::before { background:var(--chalk-yellow); color:var(--board); box-shadow:0 0 0 5px rgba(242,193,78,.25); }
+  .steps li.on { color:var(--board); }
+  .steps li.done::before { content:"\2713"; background:var(--board); color:var(--chalk-yellow); }
+  .steps li.done, .steps li.on + li::after { color:var(--board); }
+  .steps li.done + li::after { background:var(--board); }
+  .id-card { padding:24px 22px; }
+  .id-card .ic { width:52px; height:52px; border-radius:16px; background:var(--board); color:var(--chalk-yellow); display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
+  .id-card label.field { text-align:center; font-size:1.05rem; }
+  #sid { font-size:1.45rem; text-align:center; letter-spacing:.06em; font-weight:700; min-height:56px; }
+  .sign { text-align:center; margin:4px 0 14px; padding:18px 14px; }
+  .sign .emoji { font-size:5.4rem; line-height:1.1; display:inline-block; animation:wave 1.6s ease-in-out infinite; transform-origin:70% 80%; }
+  .sign .name { font-size:1.6rem; font-weight:800; color:var(--chalk-yellow); }
+  @keyframes wave { 0%, 100% { transform:rotate(0); } 25% { transform:rotate(-10deg); } 75% { transform:rotate(10deg); } }
+  .videobox { position:relative; width:100%; aspect-ratio:3/4; background:#0b0f14; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow-md); }
   video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-  .hint { position:absolute; left:0; right:0; bottom:10px; text-align:center; color:#fff; font-size:.95rem; text-shadow:0 1px 3px #000; }
-  #sid { font-size:1.3rem; text-align:center; letter-spacing:.04em; }
-  .result { font-size:1.15rem; padding:22px 18px; border-radius:var(--radius); text-align:center; }
-  .result .icon { font-size:3rem; line-height:1; display:block; margin-bottom:8px; }
-  .timer { text-align:center; color:var(--muted); margin:10px 0 0; }
-  .who { text-align:center; margin:0 0 6px; }
+  .guide { position:absolute; left:50%; top:16%; width:46%; height:44%; transform:translateX(-50%); border:3px dashed rgba(242,193,78,.85); border-radius:50%; pointer-events:none; }
+  .hint { position:absolute; left:0; right:0; bottom:12px; text-align:center; color:#fff; font-size:.95rem; font-weight:600; text-shadow:0 1px 3px #000; }
+  .who { text-align:center; margin:0 0 10px; }
+  .timer { text-align:center; color:var(--muted); margin:12px 0 0; font-weight:600; font-size:.9rem; }
+  .result { font-size:1.12rem; padding:28px 20px; border-radius:var(--radius); text-align:center; font-weight:600; box-shadow:var(--shadow-md); }
+  .result.ok { background:var(--card); color:var(--ink); border:2px solid #A9D6B6; position:relative; overflow:hidden; }
+  .result.bad { background:var(--badbg); color:var(--bad); border:1px solid #E9B7A9; }
+  .result .mark { width:88px; height:88px; margin:0 auto 12px; display:block; }
+  .result .mark circle { stroke:var(--ok); stroke-dasharray:252; stroke-dashoffset:252; animation:draw .6s ease-out forwards; }
+  .result .mark path { stroke:var(--ok); stroke-dasharray:60; stroke-dashoffset:60; animation:draw .4s .5s ease-out forwards; }
+  .result .alert { width:56px; height:56px; border-radius:50%; background:var(--bad); color:#fff; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
+  @keyframes draw { to { stroke-dashoffset:0; } }
+  .confetti i { position:absolute; width:8px; height:8px; border-radius:2px; top:-10px; animation:fall 1.6s ease-in forwards; }
+  @keyframes fall { to { transform:translateY(260px) rotate(320deg); opacity:0; } }
 </style>
 {% endblock %}
 {% block body %}
 <main>
   <div class="board checkin-head">
-    <div class="muted">{{ course }}</div>
+    <div class="muted">{{ icon("book", 15) }} {{ course }}</div>
     <h1>{{ title }}</h1>
   </div>
   <ol class="steps" aria-label="Progress">
-    <li id="s1" class="on">1. Your ID</li><li id="s2">2. Hand sign</li><li id="s3">3. Done</li>
+    <li id="s1" class="on" data-n="1">Your ID</li><li id="s2" data-n="2">Hand sign</li><li id="s3" data-n="3">Done</li>
   </ol>
 
-  <form class="card stack" id="step-id">
+  <form class="card stack id-card rise" id="step-id">
+    <span class="ic">{{ icon("users", 26) }}</span>
     <label class="field" for="sid">Your student ID</label>
     <input type="text" id="sid" inputmode="numeric" autocomplete="off" required placeholder="e.g. 202112345">
     <button class="big" type="submit" id="btn-start">Continue</button>
-    <p class="timer">This page works for <span id="ticket">{{ seconds_left }}</span> more seconds.</p>
+    <p class="timer">{{ icon("clock", 14) }} This page works for <span id="ticket">{{ seconds_left }}</span> more seconds.</p>
   </form>
 
-  <div class="card" id="step-gesture" hidden>
+  <div class="card rise" id="step-gesture" hidden>
     <p class="who" id="who"></p>
     <div class="sign board"><div class="muted">Hold this sign next to your face</div>
       <div class="emoji" id="emoji"></div><div class="name" id="gname"></div></div>
-    <div class="videobox" id="vbox"><video id="video" playsinline muted></video>
+    <div class="videobox" id="vbox"><video id="video" playsinline muted></video><div class="guide"></div>
       <div class="hint">Your face and your hand both in the picture</div></div>
     <input type="file" id="file" accept="image/*" capture="user" hidden>
-    <button class="big" id="btn-shot" style="margin-top:12px">Take photo</button>
+    <button class="big" id="btn-shot" style="margin-top:14px">Take photo</button>
     <p class="timer" id="countdown"></p>
   </div>
 
-  <div class="result" id="result" hidden role="status" aria-live="polite"></div>
+  <div class="result rise" id="result" hidden role="status" aria-live="polite"></div>
   <button class="big secondary" id="btn-retry" hidden style="margin-top:12px">Try again</button>
 </main>
 {% endblock %}
@@ -66,9 +87,17 @@ function step(n) {
 }
 function show(msg, ok) {
   const r = $("result");
-  r.hidden = false; r.className = "result " + (ok ? "ok" : "bad");
-  r.innerHTML = `<span class="icon">${ok ? "&#10003;" : "!"}</span>${esc(msg)}`;
-  if (ok) step(3);
+  r.hidden = false; r.className = "result rise " + (ok ? "ok" : "bad");
+  if (ok) {
+    const colors = ["#F2C14E", "#1F3B2D", "#BFE3CC", "#F6C2B0", "#BFD7EE"];
+    const bits = Array.from({ length: 18 }, (_, i) =>
+      `<i style="left:${(i * 37) % 100}%;background:${colors[i % colors.length]};animation-delay:${(i % 6) * 0.08}s"></i>`).join("");
+    r.innerHTML = `<span class="confetti">${bits}</span><svg class="mark" viewBox="0 0 88 88" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="44" cy="44" r="40"/><path d="M27 45l12 12 23-25"/></svg>${esc(msg)}`;
+    step(4);
+  } else {
+    r.innerHTML = `<span class="alert">!</span>${esc(msg)}`;
+  }
 }
 async function post(url, fd) {
   const r = await fetch(url, { method: "POST", body: fd, credentials: "same-origin" });

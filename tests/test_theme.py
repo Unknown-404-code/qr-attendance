@@ -125,6 +125,6 @@ def test_course_summary_numbers(tmp_path):
     [course] = dr.get("/api/courses").json()
     assert course["classes"] == 2 and round(course["avg_rate"], 3) == 0.375 and course["last_class_at"]
     html = dr.get(f"/courses/{c.cid}").text
-    assert "38%" in html and "2 classes" in html
+    assert "38%" in html and "Classes held" in html
     home = dr.get("/").text
     assert "4 students" in home and "38%" in home

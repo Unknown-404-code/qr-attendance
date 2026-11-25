@@ -12,7 +12,9 @@
   .bstat .l { font-size:.78rem; color:var(--chalk-dim); font-weight:600; display:flex; align-items:center; gap:5px; }
   @keyframes pulse { 50% { opacity:.25; } }
   @media (max-width:760px) { .banner { grid-template-columns:1fr; } }
-  @media (max-width:420px) { .bstat { padding:9px 10px; } .bstat .n { font-size:1.25rem; } }
+  @media (max-width:560px) { .banner { padding:20px 18px; } .banner h1 { font-size:1.55rem; }
+    .bstats { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; } .bstat { padding:9px 10px; }
+    .bstat .n { font-size:1.25rem; } .bstat .l { font-size:.72rem; } }
 
   .step { display:flex; gap:12px; align-items:center; margin:0 0 14px; }
   .step h2 { margin:0; }
@@ -86,7 +88,7 @@
     </div>
     <div class="bstats">
       <div class="bstat"><div class="n" id="b-students">{{ course.students }}</div><div class="l">{{ icon("users", 13) }} Students</div></div>
-      <div class="bstat"><div class="n">{{ course.classes }}</div><div class="l">{{ icon("calendar", 13) }} {{ course.classes }} class{{ "" if course.classes == 1 else "es" }}</div></div>
+      <div class="bstat"><div class="n">{{ course.classes }}</div><div class="l">{{ icon("calendar", 13) }} Classes held</div></div>
       <div class="bstat"><div class="n">{{ "%d%%"|format((course.avg_rate * 100)|round|int) if course.avg_rate is not none else "-" }}</div><div class="l">{{ icon("chart", 13) }} Avg attendance</div></div>
     </div>
   </section>
@@ -258,7 +260,7 @@ function renderLive() {
   const q = $("filter-live").value, onlyAbsent = $("only-absent").checked;
   setHTML($("live-list"), state.students.filter(s => match(s, q) && !(onlyAbsent && s.present)).map(s => {
     const manual = s.method && s.method.startsWith("manual");
-    const status = s.present ? `<span class="pill ok">Here</span> <span class="muted">${fmtTime(s.checkin_ts)}${manual ? ", marked by you" : ""}</span>`
+    const status = s.present ? `<span class="pill ok">Here</span> <span class="muted hide-sm">${fmtTime(s.checkin_ts)}${manual ? ", marked by you" : ""}</span>`
                              : `<span class="pill bad">Not here</span>`;
     const flags = (s.flags || []).map(f => `<div class="flagtext">${ICON_ALERT}${esc(f)}</div>`).join("");
     return `<tr data-id="${esc(s.student_id)}"><td><div class="who-cell">${avatar(s.name)}<div><b>${esc(s.name)}</b><div class="sid">${esc(s.student_id)}</div>${flags}</div></div></td><td>${status}</td>

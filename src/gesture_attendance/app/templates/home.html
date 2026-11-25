@@ -10,7 +10,9 @@
   .stat .n { font-size:1.7rem; font-weight:800; color:var(--chalk-yellow); line-height:1.1; }
   .stat .l { font-size:.8rem; color:var(--chalk-dim); font-weight:600; display:flex; align-items:center; gap:6px; }
   @media (max-width:760px) { .hero { grid-template-columns:1fr; } }
-  @media (max-width:420px) { .stat { min-width:0; padding:10px; } .stat .n { font-size:1.35rem; } }
+  @media (max-width:560px) { .hero { padding:20px 18px; } .hero h1 { font-size:1.6rem; }
+    .stats { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; } .stat { min-width:0; padding:10px; }
+    .stat .n { font-size:1.35rem; } .stat .l { font-size:.74rem; } }
 
   .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; }
   .section-head h2 { margin:0; }
