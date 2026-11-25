@@ -17,19 +17,26 @@ ours     : selfie ─► BlazeFace ─► ROI = 3× face ─► YOLOv8n ─► g
            selfie ─► SCRFD + ArcFace (MobileFaceNet) ─► cosine vs enrolled ┘                  and sim ≥ threshold
 ```
 
-## Quick start: take attendance today (no training)
+## Put it online for a doctor (free)
+
+[DEPLOY.md](DEPLOY.md) walks through hosting the app on a free Hugging Face Space with a free Supabase database.
+The admin signs in, creates a doctor account on the **Accounts** page, and the doctor runs classes from any laptop.
+Each doctor sees only their own courses.
+
+## Quick start on a laptop (no training)
 
 1. Install **Python 3.12** from https://www.python.org/downloads/ and tick *"Add python.exe to PATH"*.
 2. Double-click **`start.bat`**. The first run sets everything up, which takes a few minutes. After that it starts in seconds.
-   - Your browser opens the **instructor dashboard**. Keep the black console window open during class.
-3. On the dashboard:
-   - **Upload the roster**: a CSV or Excel file with a name column and a student-ID column, like `examples/roster_example.csv`.
-   - Tick **open enrollment** for the first lecture, then **Start session**.
-   - Click **Open QR board** and project it.
-   - Use **Test check-in here** to try it yourself with the laptop webcam.
-4. Students scan the QR code, type their ID, show the requested gesture next to their face, and take the photo.
-   - On a student's first check-in their face is enrolled. Confirm each pending enrollment on the dashboard.
-5. Click **Excel report** at the end of class.
+   - The console prints a first admin account (`admin@localhost` and a password) and your browser opens the sign-in
+     page. Keep the black console window open during class. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first
+     start to choose them yourself.
+3. Sign in, create a course and upload its student list once: a CSV or Excel file with a name column and a
+   student-ID column, like `examples/roster_example.csv`. You can add, edit and remove students later.
+4. Start a class. Leave **Let new students register their face** on for the first class. Click **Show QR code** and
+   project it. **Try a check-in on this computer** tests it with the laptop webcam.
+5. Students scan the QR code, type their ID, show the hand sign next to their face, and take the photo.
+   - A student's first check-in saves their face. Approve each one on the course page.
+6. End the class and download the Excel file.
 
 **How phones reach the laptop.** `start.bat` tries to open a free Cloudflare HTTPS link, which phones can use from
 any network and which gives them a live camera preview. If the tunnel can't connect, the QR code falls back to
@@ -63,9 +70,11 @@ src/gesture_attendance/
   vision/gesture_detector.py  YOLOv8 wrapper (after training on HaGRID)
   verify.py                   accept/reject decision, builders from config
   datasets.py, evaluation.py  test-set loading, metrics (bootstrap CI, McNemar, mAP, FAR/FRR, EER)
-  app/                        FastAPI web app (rotating QR, tickets, challenges, enrollment, Excel, collection page)
+  app/                        FastAPI web app (accounts, courses, rotating QR, challenges, enrollment, Excel)
+  app/db.py, app/store.py     SQLite or Postgres (Supabase) storage
   app/tunnel.py               optional free HTTPS link for phones (Cloudflare quick tunnel)
 start.bat                     one-click setup + start on Windows (uses requirements-app.txt, no torch)
+Dockerfile, DEPLOY.md         free hosting on Hugging Face Spaces + Supabase
 scripts/
   prepare_hagrid.py           6-class HaGRID subset, split by subject → YOLO format
   train_yolo.py               fine-tune YOLOv8n (same weights for both pipelines)
@@ -77,7 +86,7 @@ scripts/
   make_figures.py             report figures + qualitative success/failure grids
   run_app.py                  start the attendance server
 notebooks/colab_pipeline.ipynb  the whole offline pipeline on a free Colab T4
-tests/                        31 unit/integration tests (no models needed)
+tests/                        unit/integration tests (no models needed)
 ```
 
 ## Setup
@@ -90,7 +99,7 @@ py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install -e .
-pytest -q                        # 31 tests, ~5 s, no models or data needed
+pytest -q                        # ~15 s, no models or data needed
 ```
 
 On Colab, open `notebooks/colab_pipeline.ipynb`.
@@ -119,8 +128,8 @@ a C++ compiler on Windows.
 
 ### Weeks 9–10: app and volunteer test set
 
-- Start the app (see *Running in class*). Upload the roster on the instructor page.
-- Collect the volunteer set at `/collect?key=…`. A consent checkbox is required. The page saves images to
+- Start the app (see *Running in class*) and sign in.
+- Collect the volunteer set at `/collect` (laptop only; hidden on the hosted server). A consent checkbox is required. The page saves images to
   `data/classroom/images/` and writes labels to `labels.csv`. The protocol is in `data/README.md`.
 
 ### Week 11: baseline vs ROI on HaGRID test
@@ -179,17 +188,21 @@ the ROI and the detections. Use them for the "where ROI does not help" discussio
 python scripts/run_app.py --port 8000 --preload --tunnel --open     # what start.bat runs
 ```
 
-The console prints the instructor, board and collection URLs, including the instructor key. The key is stored
-in `data/app/instructor_key.txt`, or you can set it with `GA_INSTRUCTOR_KEY`.
+The console prints the sign-in URL. Accounts live in the database: the first admin comes from `ADMIN_EMAIL` /
+`ADMIN_PASSWORD`, or is generated and printed on first start. Admins add doctor accounts on `/admin`.
 
-1. Instructor page: upload the roster (CSV/Excel with a name and a student-ID column; see `examples/roster_example.csv`).
-   Start a session, ticking **open enrollment** for the first lecture.
-2. Project `/board`. It shows the QR code, which rotates every 3 s, and the live count.
-3. Students scan the code, enter their ID, perform the gesture shown, and take the photo.
-4. First check-in = enrollment: the face embedding is stored as *pending* and you confirm it on the dashboard.
-   An enrollment whose face matches another enrolled student is flagged `duplicate_face`.
-5. Download **Excel report (this session)**. It lists name, ID, Present / Not present, time, method and flags,
-   with Summary and Flags sheets. **Excel (all sessions)** gives the course matrix.
+1. Course page: upload the student list once per course (CSV/Excel with a name and a student-ID column; see
+   `examples/roster_example.csv`), then add, edit or remove students as the semester goes on.
+2. Start a class, with **Let new students register their face** on for the first lecture.
+3. **Show QR code** opens the board. The QR code rotates every 3 s and encodes `/q/<class id>/<token>`.
+4. Students scan the code, enter their ID, show the hand sign, and take the photo.
+5. First check-in = enrollment: the face embedding is stored as *pending* and you approve it on the course page.
+   An enrollment whose face matches another student in the course is flagged ("Face looks like another student's").
+6. **Download this class** lists name, ID, Present / Not present, time, method and flags, with Summary and Flags
+   sheets. **Download all classes** gives the course matrix. Removed students stay in classes they attended.
+
+Storage is SQLite (`data/app/attendance.db`) on a laptop, or Postgres when `DATABASE_URL` is set.
+`python scripts/run_app.py --hosted` is the server mode used on Hugging Face (see DEPLOY.md).
 
 **Phones and HTTPS.** A live camera preview needs HTTPS. On plain `http://<laptop-ip>:8000` the page falls back to
 the phone's camera picker, which still works. The easiest way to get HTTPS is a free Cloudflare quick tunnel:

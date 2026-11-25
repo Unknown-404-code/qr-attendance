@@ -3,35 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Gesture attendance{% endblock %}</title>
+<title>{% block title %}Attendance{% endblock %}</title>
 <style>
-  :root { --ink:#16202c; --muted:#5d6b7a; --line:#dde3ea; --bg:#f6f8fa; --ok:#127a3e; --okbg:#e3f5ea;
-          --bad:#b42318; --badbg:#fdecea; --accent:#1f4fd1; --warn:#9a6700; --warnbg:#fff4d6; }
+  :root {
+    --ink:#14202b; --muted:#5b6876; --line:#dfe4ea; --bg:#f4f6f8; --card:#fff;
+    --accent:#1d5bd6; --accent-ink:#fff; --accent-soft:#e8effc;
+    --ok:#127a3e; --okbg:#e2f4e8; --bad:#b42318; --badbg:#fdecea; --warn:#8a5a00; --warnbg:#fff3d1;
+    --radius:12px;
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
-  main { max-width:1100px; margin:0 auto; padding:20px; }
-  h1 { font-size:1.5rem; margin:0 0 12px; } h2 { font-size:1.1rem; margin:0 0 10px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
-  .muted { color:var(--muted); font-size:.9rem; }
-  button, .btn { font:inherit; border:1px solid var(--accent); background:var(--accent); color:#fff; padding:9px 16px;
-                 border-radius:8px; cursor:pointer; text-decoration:none; display:inline-block; }
-  button.secondary, .btn.secondary { background:#fff; color:var(--accent); }
-  button.danger { background:var(--bad); border-color:var(--bad); }
+  [hidden] { display:none !important; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  a { color:var(--accent); }
+  header.top { background:var(--card); border-bottom:1px solid var(--line); }
+  header.top .in { max-width:1100px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header.top .brand { font-weight:700; color:var(--ink); text-decoration:none; font-size:1.05rem; margin-right:auto; }
+  header.top nav { display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:.95rem; }
+  header.top nav a { text-decoration:none; }
+  header.top .who { color:var(--muted); }
+  header.top form { margin:0; }
+  main { max-width:1100px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:1.6rem; margin:0 0 4px; line-height:1.25; }
+  h2 { font-size:1.15rem; margin:0 0 12px; }
+  .lead { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+  .muted { color:var(--muted); font-size:.92rem; }
+  button, .btn { font:inherit; font-weight:600; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink);
+                 padding:10px 18px; border-radius:10px; cursor:pointer; text-decoration:none; display:inline-flex;
+                 align-items:center; justify-content:center; gap:6px; min-height:44px; }
+  button:hover, .btn:hover { filter:brightness(1.07); }
+  button.secondary, .btn.secondary { background:var(--card); color:var(--accent); border-color:var(--line); }
+  button.danger, .btn.danger { background:var(--card); color:var(--bad); border-color:#f1c4bf; }
+  button.link { background:none; border:none; color:var(--accent); padding:0; min-height:0; font-weight:500; }
+  button.small, .btn.small { padding:5px 10px; min-height:32px; font-size:.88rem; font-weight:500; }
   button:disabled { opacity:.5; cursor:default; }
-  input[type=text], select { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
-  table { border-collapse:collapse; width:100%; font-size:.92rem; }
-  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
-  th { color:var(--muted); font-weight:600; }
-  .pill { display:inline-block; padding:1px 8px; border-radius:20px; font-size:.8rem; margin-right:3px; }
+  .big { width:100%; padding:14px; font-size:1.1rem; }
+  label.field { display:block; font-weight:600; margin:0 0 6px; }
+  input[type=text], input[type=email], input[type=password], input[type=search], select {
+    font:inherit; padding:10px 12px; border:1px solid #c9d1da; border-radius:10px; width:100%; background:#fff; min-height:44px; }
+  input:focus, button:focus-visible, select:focus { outline:3px solid var(--accent-soft); outline-offset:1px; border-color:var(--accent); }
+  .stack > * + * { margin-top:12px; }
+  table { border-collapse:collapse; width:100%; font-size:.95rem; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--muted); font-weight:600; font-size:.85rem; }
+  .table-wrap { overflow-x:auto; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:20px; font-size:.82rem; font-weight:600; white-space:nowrap; }
   .ok { background:var(--okbg); color:var(--ok); } .bad { background:var(--badbg); color:var(--bad); }
-  .warn { background:var(--warnbg); color:var(--warn); }
-  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .warn { background:var(--warnbg); color:var(--warn); } .plain { background:#eef1f4; color:var(--muted); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .row > .grow { flex:1 1 200px; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:800px) { .grid2 { grid-template-columns:1fr; } }
+  .notice { padding:12px 14px; border-radius:10px; margin:0 0 16px; }
+  .notice:empty { display:none; }
+  .toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:#fff;
+           padding:10px 16px; border-radius:10px; font-size:.95rem; max-width:calc(100vw - 32px); z-index:10;
+           opacity:0; pointer-events:none; transition:opacity .2s; }
+  .toast.show { opacity:1; }
 </style>
 {% block head %}{% endblock %}
 </head>
 <body>
+{% if user %}
+<header class="top"><div class="in">
+  <a class="brand" href="/">Attendance</a>
+  <nav>
+    <span class="who">{{ user.name }}</span>
+    {% if user.role == "admin" %}<a href="/admin">Accounts</a>{% endif %}
+    <a href="/account">Password</a>
+    <form method="post" action="/logout"><button class="link" type="submit">Sign out</button></form>
+  </nav>
+</div></header>
+{% endif %}
 {% block body %}{% endblock %}
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 4000);
+}
+async function api(url, fields, method) {
+  const opt = { credentials: "same-origin", method: method || (fields ? "POST" : "GET") };
+  if (fields) opt.body = fields instanceof FormData ? fields
+    : Object.entries(fields).reduce((fd, [k, v]) => (fd.append(k, v), fd), new FormData());
+  const r = await fetch(url, opt);
+  if (r.status === 401) { location.href = "/login"; throw new Error("Please sign in again."); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || "Something went wrong (" + r.status + ").");
+  return j;
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

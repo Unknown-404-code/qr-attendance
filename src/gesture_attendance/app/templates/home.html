@@ -1,0 +1,56 @@
+{% extends "_base.html" %}
+{% block title %}Courses · Attendance{% endblock %}
+{% block head %}
+<style>
+  .courses { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; margin-bottom:24px; }
+  a.course { display:block; text-decoration:none; color:inherit; background:var(--card); border:1px solid var(--line);
+             border-radius:var(--radius); padding:18px; transition:border-color .15s, box-shadow .15s; }
+  a.course:hover { border-color:var(--accent); box-shadow:0 2px 10px rgba(29,91,214,.08); }
+  a.course h2 { margin:0 0 6px; font-size:1.15rem; }
+  .live { color:var(--ok); font-weight:600; }
+  .live::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ok);
+                  margin-right:7px; vertical-align:1px; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  .empty { text-align:center; padding:36px 18px; }
+</style>
+{% endblock %}
+{% block body %}
+<main>
+  <h1>Your courses</h1>
+  <p class="lead">Open a course to manage its students and run a class.</p>
+
+  {% if courses %}
+  <div class="courses">
+    {% for c in courses %}
+    <a class="course" href="/courses/{{ c.id }}">
+      <h2>{{ c.name }}</h2>
+      {% if c.active %}<div class="live">Class running: {{ c.present }} checked in</div>
+      {% else %}<div class="muted">{{ c.students }} student{{ "" if c.students == 1 else "s" }}</div>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty">
+    <h2>No courses yet</h2>
+    <p class="muted">Add your first course below. You'll upload its student list once, and it stays for the semester.</p>
+  </div>
+  {% endif %}
+
+  <form class="card" id="new">
+    <h2>New course</h2>
+    <div class="row">
+      <input class="grow" type="text" name="name" required placeholder="Course name, e.g. CSBP441 Computer Vision" aria-label="Course name">
+      <button type="submit">Create course</button>
+    </div>
+  </form>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("new").onsubmit = async e => {
+  e.preventDefault();
+  try { const j = await api("/api/courses", new FormData(e.target)); location.href = "/courses/" + j.id; }
+  catch (err) { toast(err.message); }
+};
+</script>
+{% endblock %}

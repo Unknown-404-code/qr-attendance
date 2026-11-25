@@ -3,7 +3,7 @@ REM ---- Gesture attendance: one-click start (Windows) ----
 cd /d "%~dp0"
 title Gesture attendance
 
-if exist ".venv\installed.ok" goto run
+if exist ".venv\installed-v2.ok" goto run
 
 echo [1/3] Creating Python environment ...
 if not exist ".venv\Scripts\python.exe" (
@@ -26,7 +26,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-echo ok> ".venv\installed.ok"
+echo ok> ".venv\installed-v2.ok"
 
 :run
 echo [3/3] Starting the attendance server ...

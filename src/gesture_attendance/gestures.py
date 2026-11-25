@@ -26,3 +26,12 @@ NONE_LABEL = "none"  # prediction when no gesture is detected
 
 def gesture_text(name: str) -> str:
     return GESTURE_TEXT.get(name, name)
+
+
+def gesture_parts(name: str) -> tuple[str, str]:
+    """(emoji, plain name) for the big picture on the check-in page; emoji is "" when there is none."""
+    text = gesture_text(name)
+    head, _, tail = text.rpartition(" ")
+    if head and not tail.isascii():
+        return tail, head
+    return "", text

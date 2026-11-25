@@ -1,62 +1,74 @@
 {% extends "_base.html" %}
-{% block title %}Check in{% endblock %}
+{% block title %}Check in · {{ course }}{% endblock %}
 {% block head %}
 <script src="/static/camera.js"></script>
 <style>
-  main { max-width:520px; }
-  #gesture { font-size:2.2rem; font-weight:700; text-align:center; margin:6px 0; }
-  .videobox { position:relative; width:100%; aspect-ratio:3/4; background:#000; border-radius:10px; overflow:hidden; }
+  main { max-width:520px; padding-top:16px; }
+  .steps { display:flex; gap:6px; margin:0 0 16px; list-style:none; padding:0; }
+  .steps li { flex:1; text-align:center; font-size:.85rem; color:var(--muted); padding-top:8px; border-top:4px solid var(--line); }
+  .steps li.on { color:var(--accent); border-color:var(--accent); font-weight:700; }
+  .steps li.done { color:var(--ok); border-color:var(--ok); }
+  .sign { text-align:center; margin:4px 0 12px; }
+  .sign .emoji { font-size:5rem; line-height:1.1; }
+  .sign .name { font-size:1.5rem; font-weight:800; }
+  .videobox { position:relative; width:100%; aspect-ratio:3/4; background:#0b0f14; border-radius:var(--radius); overflow:hidden; }
   video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-  .hint { position:absolute; left:0; right:0; bottom:8px; text-align:center; color:#fff; font-size:.9rem;
-          text-shadow:0 1px 3px #000; }
-  .big { width:100%; padding:14px; font-size:1.1rem; margin-top:10px; }
-  #result { font-size:1.1rem; padding:14px; border-radius:10px; margin-top:12px; display:none; }
-  .timer { text-align:center; color:var(--muted); }
+  .hint { position:absolute; left:0; right:0; bottom:10px; text-align:center; color:#fff; font-size:.95rem; text-shadow:0 1px 3px #000; }
+  #sid { font-size:1.3rem; text-align:center; letter-spacing:.04em; }
+  .result { font-size:1.15rem; padding:22px 18px; border-radius:var(--radius); text-align:center; }
+  .result .icon { font-size:3rem; line-height:1; display:block; margin-bottom:8px; }
+  .timer { text-align:center; color:var(--muted); margin:10px 0 0; }
+  .who { text-align:center; margin:0 0 6px; }
 </style>
 {% endblock %}
 {% block body %}
 <main>
-  <h1>Check in</h1>
-  <p class="muted">{{ title }}</p>
+  <p class="muted" style="margin:0">{{ course }}</p>
+  <h1>{{ title }}</h1>
+  <ol class="steps" aria-label="Progress">
+    <li id="s1" class="on">1. Your ID</li><li id="s2">2. Hand sign</li><li id="s3">3. Done</li>
+  </ol>
 
-  <div class="card" id="step-id">
-    <label for="sid"><b>Your student ID</b></label>
-    <div class="row" style="margin-top:8px">
-      <input type="text" id="sid" inputmode="numeric" autocomplete="off" style="flex:1" placeholder="e.g. 202112345">
-    </div>
-    <button class="big" id="btn-start">Continue</button>
-    <p class="muted timer">This page is valid for <span id="ticket">{{ seconds_left }}</span> s.</p>
-  </div>
+  <form class="card stack" id="step-id">
+    <label class="field" for="sid">Your student ID</label>
+    <input type="text" id="sid" inputmode="numeric" autocomplete="off" required placeholder="e.g. 202112345">
+    <button class="big" type="submit" id="btn-start">Continue</button>
+    <p class="timer">This page works for <span id="ticket">{{ seconds_left }}</span> more seconds.</p>
+  </form>
 
-  <div class="card" id="step-gesture" style="display:none">
-    <div class="muted" id="who"></div>
-    <div>Hold this gesture <b>next to your face</b>:</div>
-    <div id="gesture"></div>
+  <div class="card" id="step-gesture" hidden>
+    <p class="who" id="who"></p>
+    <div class="sign"><div class="muted">Hold this sign next to your face</div>
+      <div class="emoji" id="emoji"></div><div class="name" id="gname"></div></div>
     <div class="videobox" id="vbox"><video id="video" playsinline muted></video>
-      <div class="hint">Face and hand both visible</div></div>
-    <input type="file" id="file" accept="image/*" capture="user" style="display:none">
-    <button class="big" id="btn-shot">Take photo</button>
-    <p class="timer"><span id="countdown"></span></p>
+      <div class="hint">Your face and your hand both in the picture</div></div>
+    <input type="file" id="file" accept="image/*" capture="user" hidden>
+    <button class="big" id="btn-shot" style="margin-top:12px">Take photo</button>
+    <p class="timer" id="countdown"></p>
   </div>
 
-  <div id="result"></div>
-  <button class="big secondary" id="btn-retry" style="display:none">Try again</button>
+  <div class="result" id="result" hidden role="status" aria-live="polite"></div>
+  <button class="big secondary" id="btn-retry" hidden style="margin-top:12px">Try again</button>
 </main>
-
+{% endblock %}
+{% block scripts %}
 <script>
 const $ = id => document.getElementById(id);
 let challenge = null, timer = null;
 
+function step(n) {
+  ["s1", "s2", "s3"].forEach((id, i) => { $(id).className = i + 1 < n ? "done" : i + 1 === n ? "on" : ""; });
+}
 function show(msg, ok) {
   const r = $("result");
-  r.style.display = "block"; r.textContent = msg;
-  r.className = ok ? "ok" : "bad";
+  r.hidden = false; r.className = "result " + (ok ? "ok" : "bad");
+  r.innerHTML = `<span class="icon">${ok ? "&#10003;" : "!"}</span>${esc(msg)}`;
+  if (ok) step(3);
 }
-
 async function post(url, fd) {
   const r = await fetch(url, { method: "POST", body: fd, credentials: "same-origin" });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.detail || ("Error " + r.status));
+  if (!r.ok) throw new Error(j.detail || "Something went wrong. Try again.");
   return j;
 }
 
@@ -64,48 +76,50 @@ let ticketLeft = {{ seconds_left }};
 setInterval(() => { ticketLeft = Math.max(0, ticketLeft - 1); $("ticket").textContent = ticketLeft; }, 1000);
 
 async function getChallenge() {
-  $("result").style.display = "none"; $("btn-retry").style.display = "none";
+  $("result").hidden = true; $("btn-retry").hidden = true;
   const sid = $("sid").value.trim();
   if (!sid) { $("sid").focus(); return; }
   const fd = new FormData(); fd.append("student_id", sid);
+  $("btn-start").disabled = true;
   try {
     const j = await post("/api/challenge", fd);
-    if (j.already_present) { $("step-id").style.display = "none"; show("✅ " + j.name + ", you are already checked in.", true); return; }
-    challenge = j;
-    $("step-id").style.display = "none"; $("step-gesture").style.display = "block";
-    $("who").textContent = j.name + (j.enrolling ? " — first check-in: your face will be enrolled" : "")
-                         + ` · attempts left: ${j.attempts_left}`;
-    $("gesture").textContent = j.text;
+    if (j.already_present) { $("step-id").hidden = true; show(`${j.name}, you're already checked in.`, true); return; }
+    challenge = j; step(2);
+    $("step-id").hidden = true; $("step-gesture").hidden = false;
+    $("who").innerHTML = `<b>${esc(j.name)}</b>` + (j.enrolling ? "<br><span class='muted'>First check-in: this photo also saves your face.</span>" : "");
+    $("emoji").textContent = j.emoji; $("gname").textContent = j.name_text;
     const live = await SelfieCamera.start($("video"));
-    $("vbox").style.display = live ? "block" : "none";
+    $("vbox").hidden = !live;
     $("btn-shot").textContent = live ? "Take photo" : "Open camera";
     let left = j.expires_in;
     clearInterval(timer);
-    $("countdown").textContent = left + " s left";
-    timer = setInterval(() => { left--; $("countdown").textContent = Math.max(0, left) + " s left";
-                                if (left <= 0) clearInterval(timer); }, 1000);
+    const tickText = () => { $("countdown").textContent = `${Math.max(0, left)} seconds left · ${j.attempts_left} ${j.attempts_left === 1 ? "try" : "tries"} left`; };
+    tickText();
+    timer = setInterval(() => { left--; tickText(); if (left <= 0) clearInterval(timer); }, 1000);
   } catch (e) { show(e.message, false); }
+  $("btn-start").disabled = false;
 }
 
 async function send(blob, source) {
   clearInterval(timer);
-  $("btn-shot").disabled = true; $("btn-shot").textContent = "Checking…";
-  const fd = new FormData();
-  fd.append("challenge_id", challenge.challenge_id); fd.append("image", blob, "selfie.jpg"); fd.append("source", source);
+  $("btn-shot").disabled = true; $("btn-shot").textContent = "Checking...";
   try {
+    // Gallery photos up to 8 MB go up untouched: redrawing would drop the EXIF time the server checks.
+    const small = source === "file" && blob.size <= 8e6 ? blob : await SelfieCamera.shrink(blob);
+    const fd = new FormData();
+    fd.append("challenge_id", challenge.challenge_id); fd.append("image", small, "selfie.jpg"); fd.append("source", source);
     const j = await post("/api/verify", fd);
-    $("step-gesture").style.display = "none";
+    $("step-gesture").hidden = true;
     show(j.message, j.accepted);
     if (j.accepted) SelfieCamera.stop();
-    else if (j.attempts_left > 0) { $("btn-retry").style.display = "block"; $("btn-retry").textContent = `Try again (${j.attempts_left} left)`; }
-    else show(j.message + " No attempts left — please see the instructor.", false);
+    else if (j.attempts_left > 0) { $("btn-retry").hidden = false; $("btn-retry").textContent = `Try again (${j.attempts_left} ${j.attempts_left === 1 ? "try" : "tries"} left)`; }
+    else show(j.message + " You've used all your tries. Ask your instructor to mark you present.", false);
   } catch (e) { show(e.message, false); }
   $("btn-shot").disabled = false;
 }
 
-$("btn-start").onclick = getChallenge;
-$("sid").addEventListener("keydown", e => { if (e.key === "Enter") getChallenge(); });
-$("btn-retry").onclick = () => { $("step-gesture").style.display = "none"; getChallenge(); };
+$("step-id").onsubmit = e => { e.preventDefault(); getChallenge(); };
+$("btn-retry").onclick = () => { $("step-gesture").hidden = true; step(1); getChallenge(); };
 $("btn-shot").onclick = async () => {
   if (SelfieCamera.live) send(await SelfieCamera.capture($("video")), "camera");
   else $("file").click();

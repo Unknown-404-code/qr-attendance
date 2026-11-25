@@ -1,0 +1,85 @@
+{% extends "_base.html" %}
+{% block title %}Accounts · Attendance{% endblock %}
+{% block head %}
+<style>
+  .newpw { background:var(--okbg); border:1px solid #b9e2c7; }
+  .newpw code { font-size:1.15rem; font-weight:700; background:#fff; padding:2px 8px; border-radius:6px; user-select:all; }
+  td.actions { white-space:nowrap; text-align:right; }
+</style>
+{% endblock %}
+{% block body %}
+<main>
+  <h1>Accounts</h1>
+  <p class="lead">Make an account for each doctor. They sign in with their email and the password you give them.</p>
+
+  <div class="card notice newpw" id="newpw" hidden></div>
+
+  <form class="card" id="add">
+    <h2>Add a doctor</h2>
+    <div class="row">
+      <div class="grow"><label class="field" for="name">Name</label><input type="text" id="name" name="name" required placeholder="Dr Sara Khalid"></div>
+      <div class="grow"><label class="field" for="email">Email</label><input type="email" id="email" name="email" required placeholder="sara@university.edu"></div>
+      <div class="grow"><label class="field" for="password">Password</label><input type="text" id="password" name="password" minlength="8" placeholder="Leave empty to make one up" autocomplete="off"></div>
+    </div>
+    <p style="margin:14px 0 0"><button type="submit">Create account</button></p>
+  </form>
+
+  <div class="card">
+    <h2>All accounts</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <tbody id="users">
+      {% for u in users %}
+        <tr><td>{{ u.name }}</td><td>{{ u.email }}</td><td>{{ "Admin" if u.role == "admin" else "Doctor" }}</td>
+          <td>{% if u.active %}<span class="pill ok">Active</span>{% else %}<span class="pill plain">Off</span>{% endif %}</td>
+          <td class="actions">
+            <button class="secondary small" data-reset="{{ u.id }}" data-email="{{ u.email }}">New password</button>
+            {% if u.id != user.id %}
+              <button class="{{ 'danger' if u.active else 'secondary' }} small" data-active="{{ u.id }}" data-on="{{ 0 if u.active else 1 }}">{{ "Turn off" if u.active else "Turn on" }}</button>
+            {% endif %}
+          </td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="muted">A turned-off account can't sign in. Its courses and attendance stay saved.</p>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+function showPassword(email, pw) {
+  const box = document.getElementById("newpw");
+  box.hidden = false;
+  box.innerHTML = `Password for <b>${esc(email)}</b>: <code>${esc(pw)}</code><br>
+    <span class="muted">Copy it now and send it to them. It won't be shown again. They can change it after signing in.</span>`;
+  box.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+document.getElementById("add").onsubmit = async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try {
+    const j = await api("/api/admin/users", fd);
+    sessionStorage.setItem("newpw", JSON.stringify([fd.get("email"), j.password]));
+    location.reload();
+  } catch (err) { toast(err.message); }
+};
+document.getElementById("users").onclick = async e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  try {
+    if (b.dataset.reset) {
+      if (!confirm(`Make a new password for ${b.dataset.email}? Their old one stops working.`)) return;
+      const j = await api(`/api/admin/users/${b.dataset.reset}/password`, {});
+      showPassword(b.dataset.email, j.password);
+    } else if (b.dataset.active) {
+      await api(`/api/admin/users/${b.dataset.active}/active`, { active: b.dataset.on === "1" });
+      location.reload();
+    }
+  } catch (err) { toast(err.message); }
+};
+try {
+  const saved = JSON.parse(sessionStorage.getItem("newpw") || "null");
+  if (saved) { sessionStorage.removeItem("newpw"); showPassword(saved[0], saved[1]); }
+} catch (e) {}
+</script>
+{% endblock %}

@@ -25,15 +25,21 @@ def test_parse_xlsx_numeric_ids():
 
 def test_reports():
     st = Store()
-    st.upsert_students([("1", "Ali"), ("2", "Sara")])
-    sid = st.start_session("L1")
+    cid = st.create_course(st.create_user("d@x.com", "Dr", "doctor", "h"), "CV")
+    st.upsert_students(cid, [("1", "Ali"), ("2", "Sara"), ("3", "Omar")])
+    sid = st.start_session(cid, "L1")
+    st.mark_present(sid, "3")
+    st.remove_student(cid, "3")
     st.mark_present(sid, "1", face_sim=0.7)
     st.flag(sid, "2", "max_attempts", "x")
     wb = load_workbook(io.BytesIO(session_report(st, sid)))
     rows = list(wb["Attendance"].iter_rows(values_only=True))
     assert rows[0][:4] == ("No.", "Student ID", "Name", "Status")
     status = {r[1]: r[3] for r in rows[1:]}
-    assert status == {"1": "Present", "2": "Not present"}
-    assert "max_attempts" in rows[2][7]
-    wb2 = load_workbook(io.BytesIO(course_report(st)))
-    assert list(wb2.active.iter_rows(values_only=True))[1][2] == "P"
+    assert status == {"1": "Present", "2": "Not present", "3": "Present"}
+    names = {r[1]: r[2] for r in rows[1:]}
+    assert names["3"] == "Omar (removed)"
+    assert "Used all tries" in {r[1]: r[7] for r in rows[1:]}["2"]
+    wb2 = load_workbook(io.BytesIO(course_report(st, cid)))
+    rows2 = {r[0]: r for r in list(wb2.active.iter_rows(values_only=True))[1:]}
+    assert rows2["1"][2] == "P" and rows2["3"][1] == "Omar (removed)"

@@ -18,6 +18,7 @@ dependencies = [
     "matplotlib",
     "tabulate",
     "openpyxl",
+    "psycopg[binary]",
     "onnxruntime",
     "mediapipe>=0.10.14",
     "ultralytics>=8.1",
