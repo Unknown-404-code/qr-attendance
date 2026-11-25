@@ -97,23 +97,20 @@ def main():
         app.state.verifier = build_verifier(cfg)
         app.state.verifier.verify(np.zeros((480, 640, 3), np.uint8), cfg["gestures"][0], None)  # warm-up
 
-    key = app.state.instructor_key
     local = f"http://127.0.0.1:{args.port}"
     phones = cfg["app"]["base_url"]
     print("\n" + "=" * 72)
-    print(f"  Instructor dashboard : {local}/instructor?key={key}")
-    print(f"  QR board (project it): {local}/board?key={key}")
-    print(f"  Test-set collection  : {local}/collect?key={key}")
+    print(f"  Sign in             : {local}/login")
+    if app.state.generated_admin_password:
+        print(f"  First admin account  : admin@localhost / {app.state.generated_admin_password}")
     print(f"  Phones will open     : {phones}   (encoded in the QR code)")
     print(f"  Gestures             : {', '.join(cfg['gestures'])}  [{cfg['models'].get('gesture_backend', 'mediapipe')}]")
-    print(f"  Pipeline             : {cfg['pipeline']['mode']}   face threshold {cfg['verification']['face_threshold']}")
     if not phones.startswith("https"):
         print("  NOTE: without HTTPS phones use their camera app instead of a live preview (still works).")
     print("  Keep this window open during class. Ctrl+C to stop.")
     print("=" * 72 + "\n")
     if args.open:
-        threading.Thread(target=lambda: (time.sleep(1.5), webbrowser.open(f"{local}/instructor?key={key}")),
-                         daemon=True).start()
+        threading.Thread(target=lambda: (time.sleep(1.5), webbrowser.open(f"{local}/login")), daemon=True).start()
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

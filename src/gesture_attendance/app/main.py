@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..config import load_config, resolve_path
-from . import routes_admin, routes_auth, routes_doctor
+from . import routes_admin, routes_auth, routes_doctor, routes_student
 from .auth import LoginLimiter, ensure_admin
 from .context import AppContext, LoginRedirect
 from .store import Store
@@ -101,4 +101,5 @@ def create_app(cfg: dict | None = None, verifier=None, store: Store | None = Non
     routes_auth.register(app, ctx)
     routes_admin.register(app, ctx)
     routes_doctor.register(app, ctx)
+    routes_student.register(app, ctx)
     return app
