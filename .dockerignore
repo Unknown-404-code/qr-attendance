@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+.superpowers
+__pycache__
+*.pyc
+data
+runs
+models
+results
+report
+slides
+notebooks
+docs
+tests
+*.egg-info
