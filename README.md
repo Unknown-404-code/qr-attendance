@@ -19,7 +19,7 @@ ours     : selfie ─► BlazeFace ─► ROI = 3× face ─► YOLOv8n ─► g
 
 ## Put it online for a doctor (free)
 
-[DEPLOY.md](DEPLOY.md) walks through hosting the app on a free Hugging Face Space with a free Supabase database.
+[DEPLOY.md](DEPLOY.md) walks through hosting the app on Render's free plan with a free Supabase database (no card needed).
 The admin signs in, creates a doctor account on the **Accounts** page, and the doctor runs classes from any laptop.
 Each doctor sees only their own courses.
 
@@ -74,7 +74,7 @@ src/gesture_attendance/
   app/db.py, app/store.py     SQLite or Postgres (Supabase) storage
   app/tunnel.py               optional free HTTPS link for phones (Cloudflare quick tunnel)
 start.bat                     one-click setup + start on Windows (uses requirements-app.txt, no torch)
-Dockerfile, DEPLOY.md         free hosting on Hugging Face Spaces + Supabase
+Dockerfile, DEPLOY.md         free hosting on Render + Supabase (Cloud Run and Hugging Face also work)
 scripts/
   prepare_hagrid.py           6-class HaGRID subset, split by subject → YOLO format
   train_yolo.py               fine-tune YOLOv8n (same weights for both pipelines)
@@ -202,7 +202,7 @@ The console prints the sign-in URL. Accounts live in the database: the first adm
    sheets. **Download all classes** gives the course matrix. Removed students stay in classes they attended.
 
 Storage is SQLite (`data/app/attendance.db`) on a laptop, or Postgres when `DATABASE_URL` is set.
-`python scripts/run_app.py --hosted` is the server mode used on Hugging Face (see DEPLOY.md).
+`python scripts/run_app.py --hosted` is the server mode used on Render and other hosts (see DEPLOY.md).
 
 **Phones and HTTPS.** A live camera preview needs HTTPS. On plain `http://<laptop-ip>:8000` the page falls back to
 the phone's camera picker, which still works. The easiest way to get HTTPS is a free Cloudflare quick tunnel:
