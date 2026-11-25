@@ -26,7 +26,9 @@ ENV PYTHONPATH=/app/src \
 # Download the face and gesture models now, so the first check-in after a restart doesn't wait for them
 RUN mkdir -p /app/model-cache /app/data && chown -R user /app/model-cache /app/data
 USER user
-RUN python -c "from gesture_attendance.config import load_config; from gesture_attendance.verify import build_verifier; build_verifier(load_config())"
+# (download only: starting MediaPipe inside some build sandboxes aborts because it can't read the CPU count)
+RUN python -c "from gesture_attendance.vision.downloads import arcface_dir; from gesture_attendance.vision.mediapipe_gesture import gesture_model; arcface_dir(); gesture_model()" \
+    && ls -la /app/model-cache /app/model-cache/buffalo_s
 
 EXPOSE 7860
 # Hosts like Render and Cloud Run tell the app which port to use in $PORT; 7860 otherwise
