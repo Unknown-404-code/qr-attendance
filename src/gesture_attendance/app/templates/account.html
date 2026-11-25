@@ -1,11 +1,23 @@
 {% extends "_base.html" %}
 {% block title %}Password · Attendance{% endblock %}
+{% block head %}
+<style>
+  .acct { max-width:560px; }
+  .profile { display:flex; align-items:center; gap:16px; padding:22px; margin-bottom:18px; }
+  .profile .avatar { width:58px; height:58px; font-size:1.2rem; }
+  .profile h1 { font-size:1.45rem; margin:0; }
+  .tip { display:flex; gap:10px; align-items:center; color:var(--muted); font-size:.88rem; margin:6px 0 0; }
+</style>
+{% endblock %}
 {% block body %}
-<main style="max-width:520px">
-  <a class="back" href="/">&larr; All courses</a>
-  <h1>Change your password</h1>
-  <p class="lead">Signed in as {{ user.email }}.</p>
+<main class="acct">
+  <a class="back" href="/">{{ icon("arrow-left", 16) }} All courses</a>
+  <section class="board profile rise">
+    <span class="avatar av{{ user.name|length % 6 }}">{{ user.name.split()|map("first")|join("")|upper|truncate(2, True, "") }}</span>
+    <div><h1>{{ user.name }}</h1><div class="muted">{{ user.email }} · {{ "Admin" if user.role == "admin" else "Doctor" }}</div></div>
+  </section>
   <form class="card stack" id="pw">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0">{{ icon("key", 20) }} Change your password</h2>
     <div>
       <label class="field" for="current">Current password</label>
       <input type="password" id="current" name="current" autocomplete="current-password" required>
@@ -13,9 +25,9 @@
     <div>
       <label class="field" for="new">New password</label>
       <input type="password" id="new" name="new" autocomplete="new-password" minlength="8" required>
-      <p class="muted" style="margin:6px 0 0">At least 8 characters.</p>
+      <p class="tip">{{ icon("lock", 15) }} At least 8 characters. Other browsers signed in to your account are signed out.</p>
     </div>
-    <button type="submit">Save password</button>
+    <button type="submit">{{ icon("check", 18) }} Save password</button>
   </form>
 </main>
 {% endblock %}

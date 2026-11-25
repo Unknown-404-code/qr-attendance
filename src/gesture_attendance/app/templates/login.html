@@ -2,34 +2,84 @@
 {% block title %}Sign in · Attendance{% endblock %}
 {% block head %}
 <style>
-  .login { max-width:400px; margin:9vh auto 0; padding:0 16px; }
-  .login h1 { margin-bottom:12px; }
-  .login-hero { padding:22px 20px; margin:0 0 18px; }
-  .login-hero .name { font-size:1.6rem; font-weight:800; color:var(--chalk-yellow); display:flex; align-items:center; gap:10px; }
-  .login-hero .name::before { content:""; width:16px; height:16px; border-radius:4px; background:var(--chalk-yellow); }
-  .login-hero p { margin:8px 0 0; color:var(--chalk-dim); }
-  .error { background:var(--badbg); color:var(--bad); }
+  .split { min-height:100vh; display:grid; grid-template-columns:1.1fr 1fr; }
+  .login-hero { border-radius:0; box-shadow:none; padding:48px 44px 60px; display:flex; flex-direction:column; justify-content:space-between; gap:28px;
+                border-right:10px solid #2C4A3A; position:relative; overflow:hidden; }
+  .login-hero::after { content:""; position:absolute; left:0; right:0; bottom:0; height:14px; background:#6B4F33;
+                       box-shadow:inset 0 3px 0 rgba(0,0,0,.25); }
+  .login-hero .brand { display:flex; align-items:center; gap:12px; font-weight:800; font-size:1.35rem; color:var(--chalk); }
+  .login-hero .brand b { color:var(--chalk-yellow); }
+  .login-hero h1 { font-size:clamp(1.9rem, 3.4vw, 2.7rem); line-height:1.15; margin:0; max-width:15ch; }
+  .login-hero h1 em { font-style:normal; color:var(--chalk-yellow); }
+  .chalk-art { width:100%; max-width:440px; height:auto; color:var(--chalk); }
+  .steps3 { display:grid; gap:12px; list-style:none; margin:0; padding:0; }
+  .steps3 li { display:flex; gap:12px; align-items:center; color:var(--chalk-dim); font-weight:500; }
+  .steps3 .chalk-num { width:30px; height:30px; font-size:.9rem; }
+  .form-side { display:flex; align-items:center; justify-content:center; padding:40px 20px; }
+  .login { width:100%; max-width:400px; }
+  .login h2 { font-size:1.7rem; font-weight:800; margin:0 0 4px; }
+  .login .card { padding:26px; box-shadow:var(--shadow-lg); }
+  .field-ico { position:relative; }
+  .field-ico .ico { position:absolute; left:13px; top:14px; color:var(--muted); }
+  .field-ico input { padding-left:40px; }
+  .error { background:var(--badbg); color:var(--bad); display:flex; gap:8px; align-items:center; font-weight:600; }
+  @media (max-width:860px) {
+    .split { grid-template-columns:1fr; min-height:0; }
+    .login-hero { padding:28px 22px 40px; border-right:none; gap:18px; }
+    .chalk-art { max-width:300px; }
+    .steps3 { display:none; }
+  }
 </style>
 {% endblock %}
 {% block body %}
-<main class="login">
-  <div class="board login-hero">
-    <div class="name">Attendance</div>
-    <p>Students scan a rotating QR code and take a quick selfie with a hand sign.</p>
+<div class="split">
+  <section class="board login-hero">
+    <div class="brand"><span class="logo">{{ icon("qr", 22) }}</span><span>Attend<b>ance</b></span></div>
+    <h1>Take attendance in <em>under a minute</em>.</h1>
+    <svg class="chalk-art" viewBox="0 0 440 150" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <g opacity=".9">
+        <rect x="10" y="20" width="96" height="96" rx="8"/>
+        <rect x="24" y="34" width="24" height="24" rx="3"/><rect x="68" y="34" width="24" height="24" rx="3"/><rect x="24" y="78" width="24" height="24" rx="3"/>
+        <path d="M68 78h10v10M88 78h4M68 98h4M80 98h12v-8"/>
+      </g>
+      <path d="M128 68h44" stroke-dasharray="2 9" opacity=".7"/><path d="M164 60l10 8-10 8" opacity=".7"/>
+      <g stroke="#F2C14E">
+        <rect x="196" y="12" width="74" height="122" rx="12"/>
+        <path d="M222 24h22"/>
+        <path d="M233 104V66M222 106V80M244 104V72M255 106V86"/>
+        <path d="M222 106c0 10 6 16 15 16h6c8 0 14-6 14-16"/>
+      </g>
+      <path d="M292 68h44" stroke-dasharray="2 9" opacity=".7"/><path d="M328 60l10 8-10 8" opacity=".7"/>
+      <circle cx="388" cy="68" r="42" opacity=".95"/>
+      <path d="M368 69l14 14 26-30" stroke="#F2C14E" stroke-width="5"/>
+    </svg>
+    <ol class="steps3">
+      <li><span class="chalk-num">1</span>The QR code on the board changes every few seconds.</li>
+      <li><span class="chalk-num">2</span>Students scan it and show a hand sign next to their face.</li>
+      <li><span class="chalk-num">3</span>Their face is matched, and they're marked present.</li>
+    </ol>
+  </section>
+
+  <div class="form-side">
+    <main class="login rise" style="padding:0">
+      <h2>Sign in</h2>
+      <p class="lead">Use the email and password your admin gave you.</p>
+      <form class="card stack" method="post" action="/login">
+        {% if error %}<p class="notice error" role="alert">{{ icon("alert", 18) }} {{ error }}</p>{% endif %}
+        <div>
+          <label class="field" for="email">Email</label>
+          <div class="field-ico">{{ icon("mail", 18) }}
+            <input type="email" id="email" name="email" value="{{ email }}" autocomplete="username" required autofocus placeholder="you@university.edu"></div>
+        </div>
+        <div>
+          <label class="field" for="password">Password</label>
+          <div class="field-ico">{{ icon("lock", 18) }}
+            <input type="password" id="password" name="password" autocomplete="current-password" required></div>
+        </div>
+        <button class="big" type="submit">Sign in {{ icon("arrow-right", 18) }}</button>
+      </form>
+      <p class="muted">No account? Ask your admin to make one for you.</p>
+    </main>
   </div>
-  <h1>Sign in</h1>
-  <form class="card stack" method="post" action="/login">
-    {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-    <div>
-      <label class="field" for="email">Email</label>
-      <input type="email" id="email" name="email" value="{{ email }}" autocomplete="username" required autofocus>
-    </div>
-    <div>
-      <label class="field" for="password">Password</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" required>
-    </div>
-    <button class="big" type="submit">Sign in</button>
-  </form>
-  <p class="muted">No account? Ask your admin to make one for you.</p>
-</main>
+</div>
 {% endblock %}

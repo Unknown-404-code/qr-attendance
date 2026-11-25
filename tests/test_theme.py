@@ -49,7 +49,8 @@ def test_hidden_rule_kept():
 
 
 def courses_link(html: str) -> bool:
-    return re.search(r'<a[^>]*href="/"[^>]*>\s*Courses\s*</a>', html) is not None
+    return re.search(r'<a[^>]*href="/"[^>]*>(?:\s*<svg.*?</svg>)?\s*(?:<span[^>]*>)?Courses(?:</span>)?\s*</a>',
+                     html, re.S) is not None
 
 
 def test_nav_links(tmp_path):
@@ -104,3 +105,26 @@ def test_checkin_board_header(tmp_path):
     c.post("/session/start", data={"title": "Week 2"})
     html = phone(app, c.session_id()).get("/checkin").text
     assert re.search(r'class="board checkin-head"[^>]*>.*?CV', html, re.S)
+
+
+def test_course_summary_numbers(tmp_path):
+    from test_app import Scripted, ScriptedVerifier, checkin, phone
+    cam = Scripted()
+    app = make_app(tmp_path, verifier=ScriptedVerifier(cam, cam, 0.35))
+    dr = new_doctor(app)
+    c = Course(dr, dr.post("/api/courses", data={"name": "CV"}).json()["id"])
+    c.post("/roster", files={"file": ("r.csv", b"id,name\n1,Ali\n2,Sara\n3,Omar\n4,Mariam\n")})
+    [course] = dr.get("/api/courses").json()
+    assert course["classes"] == 0 and course["avg_rate"] is None and course["last_class_at"] is None
+    for present in (["1", "2"], ["1"]):           # 50% then 25%
+        c.post("/session/start", data={"enroll_open": "true"})
+        for sid in present:
+            assert checkin(phone(app, c.session_id()), sid)["accepted"]
+        c.post("/session/end")
+    c.post("/session/start", data={})              # a running class doesn't count yet
+    [course] = dr.get("/api/courses").json()
+    assert course["classes"] == 2 and round(course["avg_rate"], 3) == 0.375 and course["last_class_at"]
+    html = dr.get(f"/courses/{c.cid}").text
+    assert "38%" in html and "2 classes" in html
+    home = dr.get("/").text
+    assert "4 students" in home and "38%" in home

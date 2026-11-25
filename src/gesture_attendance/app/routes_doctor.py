@@ -24,13 +24,20 @@ def register(app: FastAPI, ctx: AppContext) -> None:
     store = ctx.store
     page_user, api_user = require_user(ctx, page=True), require_user(ctx)
 
+    def course_summary(c: dict) -> dict:
+        """Numbers shown on course cards and the course banner. Running classes don't count toward the average."""
+        n = len(store.students(c["id"]))
+        sessions = store.sessions(c["id"])
+        ended = [s for s in sessions if s["ended_at"] is not None]
+        rates = [len(store.attendance(s["id"])) / n for s in ended] if n else []
+        sess = store.active_session(c["id"])
+        return {**c, "students": n, "classes": len(ended),
+                "avg_rate": sum(rates) / len(rates) if rates else None,
+                "last_class_at": sessions[0]["started_at"] if sessions else None,
+                "active": bool(sess), "present": len(store.attendance(sess["id"])) if sess else 0}
+
     def my_courses(user: dict) -> list[dict]:
-        out = []
-        for c in store.courses(None if user["role"] == "admin" else user["id"]):
-            sess = store.active_session(c["id"])
-            out.append({**c, "students": len(store.students(c["id"])),
-                        "active": bool(sess), "present": len(store.attendance(sess["id"])) if sess else 0})
-        return out
+        return [course_summary(c) for c in store.courses(None if user["role"] == "admin" else user["id"])]
 
     def course_of(cid: int, user: dict = Depends(api_user)) -> dict:
         return owned_course(ctx, user, cid)
@@ -57,7 +64,7 @@ def register(app: FastAPI, ctx: AppContext) -> None:
 
     @app.get("/courses/{cid}")
     def course_page(cid: int, request: Request, user: dict = Depends(page_user)):
-        course = owned_course(ctx, user, cid)
+        course = course_summary(owned_course(ctx, user, cid))
         students = store.students(cid)
         return ctx.render(request, "course.html", course=course, n_students=len(students),
                           anyone_unregistered=any(s["enroll_status"] == "none" for s in students),
