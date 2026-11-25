@@ -19,6 +19,7 @@ python-multipart
 jinja2
 qrcode[pil]
 openpyxl
+psycopg[binary]
 
 # Tests
 pytest

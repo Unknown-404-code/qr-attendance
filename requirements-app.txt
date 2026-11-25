@@ -12,3 +12,4 @@ python-multipart
 jinja2
 qrcode[pil]
 openpyxl
+psycopg[binary]      # Postgres (Supabase) when DATABASE_URL is set
