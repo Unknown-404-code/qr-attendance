@@ -5,9 +5,11 @@ Table definitions use `{id}`, `{blob}` and `{real}`, which `ddl()` fills in per 
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 from pathlib import Path
+from urllib.parse import quote
 
 DDL = {
     "sqlite": {"id": "INTEGER PRIMARY KEY AUTOINCREMENT", "blob": "BLOB", "real": "REAL"},
@@ -22,6 +24,25 @@ def ddl(sql: str, dialect: str) -> str:
 
 def is_postgres_url(target) -> bool:
     return str(target).startswith(("postgres://", "postgresql://"))
+
+
+_PG_URL = re.compile(r"^(postgres(?:ql)?://)([^:/@]+):(.*)@([^@]*)$", re.S)
+
+
+def normalize_pg_url(url: str) -> str:
+    """Percent-encode the password in a pasted connection string.
+
+    People paste Supabase's link with their raw password in it. Characters like @ : / # ? in the password
+    break URL parsing (the part after an @ in the password gets read as the host). The host part never
+    contains an @, so everything between "user:" and the LAST @ is the password. Already-encoded passwords
+    (containing %XX) are left alone."""
+    m = _PG_URL.match(url.strip())
+    if not m:
+        return url
+    scheme, user, password, rest = m.groups()
+    if re.search(r"%[0-9A-Fa-f]{2}", password):
+        return url
+    return f"{scheme}{user}:{quote(password, safe='')}@{rest}"
 
 
 class Database:
@@ -76,7 +97,7 @@ class PostgresDatabase(Database):
 
     def __init__(self, url: str, schema: str | None = None):
         super().__init__()
-        self.url, self.schema = url, schema
+        self.url, self.schema = normalize_pg_url(url), schema
         self.conn = self._connect()
 
     def _connect(self):

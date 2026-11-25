@@ -37,3 +37,21 @@ def test_reconnects_after_drop(db_url):
     db = make(db_url)
     db.conn.close()
     assert db.q("SELECT 1 AS n") == [{"n": 1}]
+
+
+def test_postgres_url_with_special_characters_in_password():
+    from gesture_attendance.app.db import normalize_pg_url
+    raw = "postgresql://postgres.ref:p@ss:w/rd#1?@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+    fixed = normalize_pg_url(raw)
+    assert fixed == "postgresql://postgres.ref:p%40ss%3Aw%2Frd%231%3F@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+    from urllib.parse import unquote, urlsplit
+    parts = urlsplit(fixed)
+    assert parts.hostname == "aws-0-us-east-1.pooler.supabase.com" and unquote(parts.password) == "p@ss:w/rd#1?"
+
+
+def test_postgres_url_already_encoded_or_plain_is_unchanged():
+    from gesture_attendance.app.db import normalize_pg_url
+    for url in ("postgresql://postgres.ref:Plain123@host:5432/postgres",
+                "postgresql://postgres.ref:p%40ss@host:5432/postgres",
+                "postgresql://postgres:@127.0.0.1:65456/postgres"):
+        assert normalize_pg_url(url) == url
