@@ -83,7 +83,10 @@ class PostgresDatabase(Database):
         import psycopg
         from psycopg.rows import dict_row
         # prepare_threshold=None: Supabase's transaction pooler cannot keep prepared statements
-        conn = psycopg.connect(self.url, autocommit=True, prepare_threshold=None, row_factory=dict_row)
+        # timeouts + keepalives: a connection the network dropped silently fails fast instead of hanging
+        conn = psycopg.connect(self.url, autocommit=True, prepare_threshold=None, row_factory=dict_row,
+                               connect_timeout=10, keepalives=1, keepalives_idle=60, keepalives_interval=10,
+                               keepalives_count=3)
         if self.schema:
             conn.execute(f'SET search_path TO "{self.schema}"')
         return conn

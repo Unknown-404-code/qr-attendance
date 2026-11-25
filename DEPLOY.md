@@ -33,6 +33,9 @@ You don't need to create any tables; the app makes them on first start.
 | `ADMIN_EMAIL` | your email. You sign in with it. |
 | `ADMIN_PASSWORD` | your admin password, at least 8 characters |
 
+Also add a **variable** (not a secret) named `TZ` with your campus time zone, for example `Asia/Dubai` or
+`Asia/Riyadh`. Without it, times in the Excel files are in UTC.
+
 Keep `GA_SECRET` the same forever. Changing it signs everyone out.
 
 ## 3. Upload the app

@@ -3,7 +3,8 @@
 FROM python:3.11-slim
 
 # OpenCV and MediaPipe need these system libraries
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libegl1 libgles2 \
+# tzdata: set the TZ secret (e.g. Asia/Dubai) so Excel times and default class titles use campus time
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libegl1 libgles2 tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Hugging Face runs the container as user 1000

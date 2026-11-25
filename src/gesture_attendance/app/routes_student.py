@@ -7,9 +7,10 @@ from __future__ import annotations
 import csv
 import secrets
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 
 from ..config import resolve_path
@@ -19,6 +20,18 @@ from . import texts
 from .context import AppContext, require_user
 
 TICKET_COOKIE, DEVICE_COOKIE = "ga_ticket", "ga_dev"
+
+
+def photo_is_stale(taken: datetime, max_age_s: float) -> bool:
+    """True if a photo's EXIF time is more than `max_age_s` away from now.
+
+    With a zone (OffsetTimeOriginal) the check is exact. Without one, the time is the phone's local time in an
+    unknown zone, so any zone from UTC-12 to UTC+14 is allowed; a photo from yesterday is still caught."""
+    now_utc = datetime.now(timezone.utc)
+    if taken.tzinfo is not None:
+        return abs((now_utc - taken).total_seconds()) > max_age_s
+    diff = (now_utc.replace(tzinfo=None) - taken).total_seconds()  # = age - zone offset
+    return not (-14 * 3600 - max_age_s <= diff <= 12 * 3600 + max_age_s)
 
 
 def register(app: FastAPI, ctx: AppContext) -> None:
@@ -93,6 +106,12 @@ def register(app: FastAPI, ctx: AppContext) -> None:
     @app.post("/api/verify")
     async def verify(request: Request, challenge_id: str = Form(...), image: UploadFile = File(...),
                      source: str = Form("camera")):
+        data = await image.read()
+        # the database calls and the face/gesture check block; run them off the event loop so the QR board
+        # and other students' requests keep moving while a selfie is checked
+        return await run_in_threadpool(check_selfie, request, challenge_id, data, source)
+
+    def check_selfie(request: Request, challenge_id: str, data: bytes, source: str):
         tk = ticket(request)
         if tk is None:
             raise HTTPException(401, texts.EXPIRED_TEXT)
@@ -100,7 +119,6 @@ def register(app: FastAPI, ctx: AppContext) -> None:
         ch = store.take_challenge(challenge_id)
         if ch is None or ch["session_id"] != t["sid"] or ch["device_id"] != t["dev"]:
             raise HTTPException(400, texts.CHALLENGE_USED)
-        data = await image.read()
         if len(data) > 12 * 2**20:
             raise HTTPException(413, texts.PHOTO_TOO_BIG)
         sid, sess_id = ch["student_id"], ch["session_id"]
@@ -130,7 +148,7 @@ def register(app: FastAPI, ctx: AppContext) -> None:
             # an unreadable file (HEIC, broken upload) is not a failed try: the student just picks another photo
             return result("bad_image", False, store.n_attempts(sess_id, sid))
         max_age = A.get("max_photo_age_s", 600)
-        if taken is not None and max_age and abs((datetime.now() - taken).total_seconds()) > max_age:
+        if taken is not None and max_age and photo_is_stale(taken, max_age):
             store.flag(sess_id, sid, "stale_photo", f"EXIF time {taken:%Y-%m-%d %H:%M}")
             return finish("stale_photo")
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -42,16 +42,24 @@ def _secret(data_dir: Path, env: str, fname: str, nbytes: int) -> str:
 
 
 def decode_image(data: bytes, max_side: int = 1920) -> tuple[np.ndarray, datetime | None]:
-    """Decode an upload (applying EXIF rotation) -> BGR array and the EXIF capture time if present."""
+    """Decode an upload (applying EXIF rotation) -> BGR array and the EXIF capture time if present.
+
+    The time is timezone-aware when the phone wrote OffsetTimeOriginal, else naive phone-local time."""
     from PIL import Image, ImageOps
 
     im = Image.open(io.BytesIO(data))
     taken = None
     try:
         exif = im.getexif()
-        raw = exif.get_ifd(0x8769).get(36867) or exif.get(306)  # DateTimeOriginal / DateTime
+        sub = exif.get_ifd(0x8769)
+        raw = sub.get(36867) or exif.get(306)  # DateTimeOriginal / DateTime
         if raw:
             taken = datetime.strptime(str(raw).strip("\x00 "), "%Y:%m:%d %H:%M:%S")
+            off = str(sub.get(36881) or "").strip("\x00 ")  # OffsetTimeOriginal, e.g. "+04:00"
+            if len(off) == 6 and off[0] in "+-" and off[3] == ":":
+                sign = 1 if off[0] == "+" else -1
+                delta = timedelta(hours=int(off[1:3]), minutes=int(off[4:6]))
+                taken = taken.replace(tzinfo=timezone(sign * delta))
     except Exception:
         taken = None
     im = ImageOps.exif_transpose(im).convert("RGB")

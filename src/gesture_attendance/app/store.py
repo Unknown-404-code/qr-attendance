@@ -131,8 +131,13 @@ class Store:
         if not sid:
             raise ValueError("Enter a student ID.")
         with self.db.lock:
-            if self._any_student(cid, sid):
+            existing = self._any_student(cid, sid)
+            if existing and existing["removed_at"] is None:
                 raise ValueError(f"ID {sid} is already in this course.")
+            if existing:  # removed earlier: bring them back with their history
+                self.db.x("UPDATE students SET name=?, removed_at=NULL WHERE course_id=? AND student_id=?",
+                          (name.strip() or existing["name"], cid, sid))
+                return
             self.db.x("INSERT INTO students(course_id, student_id, name) VALUES(?, ?, ?)", (cid, sid, name.strip()))
 
     def update_student(self, cid: int, old_sid: str, new_sid: str, name: str):

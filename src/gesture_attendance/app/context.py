@@ -1,6 +1,7 @@
 """Shared app state and the login checks every route module uses."""
 from __future__ import annotations
 
+import hashlib
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -42,12 +43,17 @@ class AppContext:
                                                status_code=status_code)
 
 
+def password_version(user: dict) -> str:
+    """Changes whenever the password changes, so old sign-in cookies stop working."""
+    return hashlib.sha256(user["password_hash"].encode()).hexdigest()[:12]
+
+
 def current_user(ctx: AppContext, request: Request) -> dict | None:
     data = ctx.signer.unsign(request.cookies.get(USER_COOKIE))
     if not data or "uid" not in data:
         return None
     u = ctx.store.user(int(data["uid"]))
-    if not u or not u["active"]:
+    if not u or not u["active"] or data.get("pv") != password_version(u):
         return None
     return u
 
@@ -84,5 +90,6 @@ def owned_course(ctx: AppContext, user: dict, cid: int) -> dict:
 
 
 def set_login_cookie(ctx: AppContext, request: Request, response, uid: int):
-    response.set_cookie(USER_COOKIE, ctx.signer.sign({"uid": uid}, USER_TTL_S), httponly=True, samesite="lax",
+    pv = password_version(ctx.store.user(uid))
+    response.set_cookie(USER_COOKIE, ctx.signer.sign({"uid": uid, "pv": pv}, USER_TTL_S), httponly=True, samesite="lax",
                         secure=request.url.scheme == "https", max_age=USER_TTL_S)

@@ -104,7 +104,8 @@ async function send(blob, source) {
   clearInterval(timer);
   $("btn-shot").disabled = true; $("btn-shot").textContent = "Checking...";
   try {
-    const small = await SelfieCamera.shrink(blob);
+    // Gallery photos up to 8 MB go up untouched: redrawing would drop the EXIF time the server checks.
+    const small = source === "file" && blob.size <= 8e6 ? blob : await SelfieCamera.shrink(blob);
     const fd = new FormData();
     fd.append("challenge_id", challenge.challenge_id); fd.append("image", small, "selfie.jpg"); fd.append("source", source);
     const j = await post("/api/verify", fd);
