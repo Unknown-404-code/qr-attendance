@@ -2,7 +2,10 @@
 {% block title %}{{ title }}{% endblock %}
 {% block body %}
 <main style="max-width:520px; padding-top:12vh; text-align:center">
-  <h1>{{ title }}</h1>
-  <p class="lead">{{ msg }}</p>
+  <div class="board rise" style="padding:34px 24px">
+    <div style="width:64px;height:64px;border-radius:18px;background:var(--chalk-yellow);color:var(--board);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">{{ icon("qr", 32) }}</div>
+    <h1 style="color:var(--chalk-yellow)">{{ title }}</h1>
+    <p class="lead" style="margin:10px 0 0">{{ msg }}</p>
+  </div>
 </main>
 {% endblock %}

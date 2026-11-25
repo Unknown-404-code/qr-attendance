@@ -2,38 +2,62 @@
 {% block title %}Accounts · Attendance{% endblock %}
 {% block head %}
 <style>
-  .newpw { background:var(--okbg); border:1px solid #b9e2c7; }
-  .newpw code { font-size:1.15rem; font-weight:700; background:#fff; padding:2px 8px; border-radius:6px; user-select:all; }
+  .page-head { padding:24px 26px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+  .page-head h1 { margin:0; }
+  .chips { display:flex; gap:10px; flex-wrap:wrap; }
+  .chip { background:rgba(245,241,230,.08); border:1px solid rgba(245,241,230,.16); border-radius:12px; padding:9px 14px; color:var(--chalk-dim); font-weight:600; font-size:.88rem; }
+  .chip b { color:var(--chalk-yellow); font-size:1.25rem; margin-right:4px; }
+  .add-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .add-head .ic { width:42px; height:42px; border-radius:12px; background:var(--accent-soft); color:var(--board); display:inline-flex; align-items:center; justify-content:center; }
+  .add-head h2 { margin:0; }
+  .newpw { background:var(--okbg); border:1px solid #A9D6B6; color:var(--ink); display:flex; gap:14px; align-items:flex-start; }
+  .newpw .ic { width:40px; height:40px; border-radius:50%; background:var(--ok); color:#fff; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .newpw code { font-size:1.2rem; font-weight:800; background:#fff; color:var(--board); padding:3px 10px; border-radius:8px; user-select:all; border:1px dashed #8FBF9E; }
+  .newpw .muted { color:#3F5A47; }
   td.actions { white-space:nowrap; text-align:right; }
+  .role { display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:.84rem; padding:3px 10px; border-radius:20px; }
+  .role.admin { background:var(--board); color:var(--chalk-yellow); }
+  .role.doctor { background:#E6EFE8; color:var(--board); }
+  .email { color:var(--muted); font-size:.88rem; }
+  @media (max-width:640px) { .hide-sm { display:none; } td.actions { white-space:normal; } }
 </style>
 {% endblock %}
 {% block body %}
 <main>
-  <h1>Accounts</h1>
-  <p class="lead">Make an account for each doctor. They sign in with their email and the password you give them.</p>
+  <a class="back" href="/">{{ icon("arrow-left", 16) }} All courses</a>
+  <section class="board page-head rise">
+    <div><div class="eyebrow">Admin</div><h1>Accounts</h1>
+      <div class="muted">Make an account for each doctor. They sign in with their email and the password you give them.</div></div>
+    <div class="chips">
+      <span class="chip"><b>{{ users|selectattr("role", "equalto", "doctor")|list|length }}</b> doctors</span>
+      <span class="chip"><b>{{ users|selectattr("active")|list|length }}</b> active</span>
+    </div>
+  </section>
 
   <div class="card notice newpw" id="newpw" hidden></div>
 
   <form class="card" id="add">
-    <h2>Add a doctor</h2>
+    <div class="add-head"><span class="ic">{{ icon("user-plus", 22) }}</span><h2>Add a doctor</h2></div>
     <div class="row">
       <div class="grow"><label class="field" for="name">Name</label><input type="text" id="name" name="name" required placeholder="Dr Sara Khalid"></div>
       <div class="grow"><label class="field" for="email">Email</label><input type="email" id="email" name="email" required placeholder="sara@university.edu"></div>
       <div class="grow"><label class="field" for="password">Password</label><input type="text" id="password" name="password" minlength="8" placeholder="Leave empty to make one up" autocomplete="off"></div>
     </div>
-    <p style="margin:14px 0 0"><button type="submit">Create account</button></p>
+    <p style="margin:16px 0 0"><button type="submit">{{ icon("plus", 18) }} Create account</button></p>
   </form>
 
   <div class="card">
     <h2>All accounts</h2>
     <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Person</th><th class="hide-sm">Role</th><th>Status</th><th></th></tr></thead>
       <tbody id="users">
       {% for u in users %}
-        <tr><td>{{ u.name }}</td><td>{{ u.email }}</td><td>{{ "Admin" if u.role == "admin" else "Doctor" }}</td>
+        <tr><td><div class="who-cell"><span class="avatar av{{ u.name|length % 6 }}">{{ u.name.split()|map("first")|join("")|upper|truncate(2, True, "") }}</span>
+              <div><b>{{ u.name }}</b><div class="email">{{ u.email }}</div></div></div></td>
+          <td class="hide-sm"><span class="role {{ u.role }}">{{ "Admin" if u.role == "admin" else "Doctor" }}</span></td>
           <td>{% if u.active %}<span class="pill ok">Active</span>{% else %}<span class="pill plain">Off</span>{% endif %}</td>
           <td class="actions">
-            <button class="secondary small" data-reset="{{ u.id }}" data-email="{{ u.email }}">New password</button>
+            <button class="secondary small" data-reset="{{ u.id }}" data-email="{{ u.email }}">{{ icon("key", 15) }} New password</button>
             {% if u.id != user.id %}
               <button class="{{ 'danger' if u.active else 'secondary' }} small" data-active="{{ u.id }}" data-on="{{ 0 if u.active else 1 }}">{{ "Turn off" if u.active else "Turn on" }}</button>
             {% endif %}
@@ -41,7 +65,7 @@
       {% endfor %}
       </tbody>
     </table></div>
-    <p class="muted">A turned-off account can't sign in. Its courses and attendance stay saved.</p>
+    <p class="muted" style="margin-bottom:0">A turned-off account can't sign in. Its courses and attendance stay saved.</p>
   </div>
 </main>
 {% endblock %}
@@ -50,8 +74,8 @@
 function showPassword(email, pw) {
   const box = document.getElementById("newpw");
   box.hidden = false;
-  box.innerHTML = `Password for <b>${esc(email)}</b>: <code>${esc(pw)}</code><br>
-    <span class="muted">Copy it now and send it to them. It won't be shown again. They can change it after signing in.</span>`;
+  box.innerHTML = `<span class="ic">{{ icon("check", 20)|replace("\n", "") }}</span><div>Password for <b>${esc(email)}</b>: <code>${esc(pw)}</code><br>
+    <span class="muted">Copy it now and send it to them. It won't be shown again. They can change it after signing in.</span></div>`;
   box.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 document.getElementById("add").onsubmit = async e => {
