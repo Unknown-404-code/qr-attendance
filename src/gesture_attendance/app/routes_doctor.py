@@ -57,7 +57,11 @@ def register(app: FastAPI, ctx: AppContext) -> None:
 
     @app.get("/courses/{cid}")
     def course_page(cid: int, request: Request, user: dict = Depends(page_user)):
-        return ctx.render(request, "course.html", course=owned_course(ctx, user, cid), gestures=ctx.gestures)
+        course = owned_course(ctx, user, cid)
+        students = store.students(cid)
+        return ctx.render(request, "course.html", course=course, n_students=len(students),
+                          anyone_unregistered=any(s["enroll_status"] == "none" for s in students),
+                          max_attempts=ctx.cfg["app"]["max_attempts"])
 
     @app.get("/courses/{cid}/board")
     def board_page(cid: int, request: Request, user: dict = Depends(page_user)):

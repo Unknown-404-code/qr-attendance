@@ -1,0 +1,303 @@
+{% extends "_base.html" %}
+{% block title %}{{ course.name }} · Attendance{% endblock %}
+{% block head %}
+<style>
+  .back { display:inline-block; margin-bottom:8px; text-decoration:none; font-size:.95rem; }
+  .step { display:flex; gap:12px; align-items:baseline; margin:0 0 12px; }
+  .step .n { flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent);
+             font-weight:700; display:inline-flex; align-items:center; justify-content:center; font-size:.95rem; }
+  .step h2 { margin:0; }
+  details.card > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:12px; }
+  details.card > summary::-webkit-details-marker { display:none; }
+  details.card > summary::after { content:"Show"; margin-left:auto; color:var(--accent); font-size:.92rem; }
+  details.card[open] > summary::after { content:"Hide"; }
+  details.card[open] > summary { margin-bottom:14px; }
+  .drop { border:2px dashed #c3cdd8; border-radius:var(--radius); padding:22px; text-align:center; background:#fafbfc; }
+  .drop.over { border-color:var(--accent); background:var(--accent-soft); }
+  .drop input[type=file] { display:none; }
+  .live-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .live-head h2 { margin:0; }
+  .count { font-size:2.8rem; font-weight:800; line-height:1; }
+  .count small { font-size:1.1rem; font-weight:600; color:var(--muted); }
+  .bigbtn { font-size:1.15rem; padding:14px 24px; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0 4px; }
+  .approve { background:var(--warnbg); border:1px solid #f0d58a; border-radius:10px; padding:12px 14px; margin:14px 0 0; }
+  .approve ul { margin:8px 0 0; padding:0; list-style:none; }
+  .approve li { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:4px 0; }
+  .approve li b { margin-right:auto; }
+  .flagtext { color:var(--warn); font-size:.88rem; }
+  td.act { white-space:nowrap; text-align:right; }
+  tr.editing input { min-height:36px; padding:6px 8px; }
+  .filter { max-width:280px; }
+  .past li { padding:6px 0; border-bottom:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .past li span { margin-right:auto; }
+  .past { list-style:none; padding:0; margin:0; }
+  .danger-zone { border-color:#f1c4bf; }
+  @media (max-width:600px) { .hide-sm { display:none; } .count { font-size:2.2rem; } }
+</style>
+{% endblock %}
+{% block body %}
+<main>
+  <a class="back" href="/">&larr; All courses</a>
+  <h1>{{ course.name }}</h1>
+  <p class="lead" id="lead">&nbsp;</p>
+
+  <!-- 1. Students -->
+  {% if n_students == 0 %}
+  <section class="card" id="students-empty">
+    <div class="step"><span class="n">1</span><h2>Add your students</h2></div>
+    <p class="muted" style="margin-top:0">Upload the class list once. It stays for the whole semester, and you can edit it any time.</p>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".csv,.xlsx">
+      <b>Upload a CSV or Excel file</b><br>
+      <span class="muted">It needs a name column and a student ID column. Click to choose, or drop the file here.</span>
+    </label>
+  </section>
+  {% else %}
+  <details class="card" id="students-box">
+    <summary><span class="step" style="margin:0"><span class="n">1</span><h2>Students ({{ n_students }})</h2></span></summary>
+    <div class="row" style="margin-bottom:10px">
+      <input type="search" class="filter grow" id="filter" placeholder="Find by name or ID" aria-label="Find a student">
+      <label class="btn secondary small" for="file" style="cursor:pointer">Upload a new file</label>
+      <input type="file" id="file" accept=".csv,.xlsx" hidden>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Name</th><th class="hide-sm">Face photo</th><th></th></tr></thead>
+      <tbody id="roster"></tbody>
+    </table></div>
+    <form class="row" id="add" style="margin-top:14px">
+      <input type="text" name="student_id" required placeholder="Student ID" aria-label="Student ID" style="max-width:180px">
+      <input type="text" class="grow" name="name" placeholder="Full name" aria-label="Full name">
+      <button class="secondary" type="submit">Add student</button>
+    </form>
+    <p class="muted" style="margin-bottom:0">A new file adds new students and updates names. It never removes anyone.
+      Removed students stay in the Excel files for classes they attended.</p>
+  </details>
+  {% endif %}
+
+  <!-- 2. Start class -->
+  <section class="card" id="start-box" hidden>
+    <div class="step"><span class="n">2</span><h2>Start a class</h2></div>
+    <form class="stack" id="start">
+      <div><label class="field" for="title">Class title <span class="muted">(optional)</span></label>
+        <input type="text" id="title" name="title" placeholder="e.g. Week 5 lecture"></div>
+      <label class="row" style="gap:8px; font-weight:500">
+        <input type="checkbox" name="enroll_open" id="enroll" {{ "checked" if anyone_unregistered else "" }} style="width:20px;height:20px">
+        Let new students register their face
+      </label>
+      <p class="muted" style="margin:0">Leave this on for the first class. A student's first check-in saves their face, and you approve it here.</p>
+      <div><button class="bigbtn" type="submit" {{ "disabled" if n_students == 0 else "" }}>Start class</button></div>
+    </form>
+  </section>
+
+  <!-- 3. During class -->
+  <section class="card" id="live-box" hidden>
+    <div class="live-head">
+      <span class="step" style="margin:0"><span class="n">3</span><h2 id="live-title"></h2></span>
+    </div>
+    <div class="toolbar">
+      <a class="btn bigbtn" id="show-qr" target="_blank" href="/courses/{{ course.id }}/board">Show QR code</a>
+      <div style="margin:0 8px"><div class="count"><span id="present">0</span> <small>of <span id="roster-n">0</span> checked in</small></div></div>
+    </div>
+    <p class="muted" style="margin:6px 0 0">Put the QR code on the projector. It changes every few seconds, so a photo of it won't work later.</p>
+    <div class="approve" id="approve" hidden><b>Face photos waiting for your approval</b><br>
+      <span class="muted">Approve once you've checked the name matches the person in the room.</span><ul id="approve-list"></ul></div>
+    <div class="toolbar">
+      <button class="secondary small" id="selftest" title="Opens the student page here, using this computer's camera">Try a check-in on this computer</button>
+      <button class="secondary small" id="toggle-enroll"></button>
+      <button class="danger small" id="end">End class</button>
+    </div>
+    <div class="row" style="margin:14px 0 8px">
+      <input type="search" class="filter grow" id="filter-live" placeholder="Find by name or ID" aria-label="Find a student">
+      <label class="row" style="gap:6px;font-weight:500"><input type="checkbox" id="only-absent" style="width:18px;height:18px"> Only not checked in</label>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th class="hide-sm">ID</th><th>Status</th><th></th></tr></thead>
+      <tbody id="live-list"></tbody>
+    </table></div>
+    <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">Details: recent tries</summary>
+      <p class="muted">Median check time: <span id="lat">-</span></p>
+      <div class="table-wrap"><table><tbody id="attempts"></tbody></table></div>
+    </details>
+  </section>
+
+  <!-- 4. After class -->
+  <section class="card" id="after-box" hidden>
+    <div class="step"><span class="n">4</span><h2>Attendance files</h2></div>
+    <div class="row" style="margin-bottom:12px">
+      <a class="btn secondary" id="dl-last" href="#">Download last class</a>
+      <a class="btn secondary" href="/api/courses/{{ course.id }}/course_report.xlsx">Download all classes</a>
+    </div>
+    <details><summary class="muted" style="cursor:pointer">Past classes</summary><ul class="past" id="past"></ul></details>
+  </section>
+
+  <details class="card danger-zone">
+    <summary><h2 style="margin:0">Delete this course</h2></summary>
+    <p class="muted">This deletes the student list, saved face photos and every class of this course. It can't be undone.</p>
+    <form class="row" id="del">
+      <input type="text" class="grow" name="confirm_name" placeholder="Type {{ course.name }} to confirm" aria-label="Course name">
+      <button class="danger" type="submit">Delete course</button>
+    </form>
+  </details>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+const CID = {{ course.id }}, BASE = `/api/courses/${CID}`, MAX_TRIES = {{ max_attempts }};
+const $ = id => document.getElementById(id);
+const fmtTime = ts => ts ? new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+const fmtDate = ts => new Date(ts * 1000).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+const FACE = { none: ["plain", "Not yet"], pending: ["warn", "Waiting for approval"], confirmed: ["ok", "Saved"] };
+let state = null, editing = null, timer = null;
+
+// Replace a list's HTML only when it changed, so a button isn't swapped out under the mouse mid-click.
+function setHTML(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
+
+function match(s, q) { q = q.trim().toLowerCase(); return !q || s.name.toLowerCase().includes(q) || s.student_id.toLowerCase().includes(q); }
+
+function renderRoster() {
+  const tb = $("roster"); if (!tb || !state) return;
+  const q = $("filter").value;
+  setHTML(tb, state.students.filter(s => match(s, q)).map(s => {
+    const id = esc(s.student_id);
+    if (editing === s.student_id) return `<tr class="editing" data-id="${id}">
+      <td><input type="text" value="${id}" name="student_id" aria-label="Student ID" style="max-width:140px"></td>
+      <td><input type="text" value="${esc(s.name)}" name="name" aria-label="Name"></td><td class="hide-sm"></td>
+      <td class="act"><button class="small" data-save>Save</button> <button class="secondary small" data-cancel>Cancel</button></td></tr>`;
+    const [cls, label] = FACE[s.enroll_status] || FACE.none;
+    const reset = s.enroll_status !== "none" ? ` <button class="link small" data-reset title="Delete the saved face so they register again">Reset</button>` : "";
+    return `<tr data-id="${id}"><td>${id}</td><td>${esc(s.name)}</td>
+      <td class="hide-sm"><span class="pill ${cls}">${label}</span>${reset}</td>
+      <td class="act"><button class="secondary small" data-edit>Edit</button> <button class="danger small" data-remove>Remove</button></td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="muted">No student matches.</td></tr>`);
+}
+
+function renderLive() {
+  const sess = state.session, active = sess && !sess.ended_at;
+  $("start-box").hidden = active || !state.roster;
+  $("live-box").hidden = !active;
+  $("after-box").hidden = !(state.sessions || []).length;
+  $("lead").textContent = active ? `Class running since ${fmtTime(sess.started_at)}.`
+    : state.roster ? "No class running. Start one when you're ready." : "Start by adding your students.";
+  if ((state.sessions || []).length) {
+    const last = state.sessions[0];
+    $("dl-last").href = `${BASE}/report.xlsx?session_id=${last.id}`;
+    $("dl-last").textContent = active ? "Download this class so far" : `Download last class (${fmtDate(last.started_at)})`;
+    setHTML($("past"), state.sessions.map(s => `<li><span>${esc(s.title)} <span class="muted">${fmtDate(s.started_at)}</span></span>
+      <a href="${BASE}/report.xlsx?session_id=${s.id}">Download</a></li>`).join(""));
+  }
+  if (!active) return;
+  $("live-title").textContent = sess.title;
+  $("present").textContent = state.present; $("roster-n").textContent = state.roster;
+  $("toggle-enroll").textContent = sess.enroll_open ? "Stop face registration" : "Let new students register";
+  $("lat").textContent = state.median_latency_ms ? (state.median_latency_ms / 1000).toFixed(1) + " s" : "-";
+
+  const pend = state.pending_enrollments || [];
+  $("approve").hidden = !pend.length;
+  setHTML($("approve-list"), pend.map(s => `<li data-id="${esc(s.student_id)}"><b>${esc(s.name)} <span class="muted">${esc(s.student_id)}</span></b>
+    <button class="small" data-approve>Approve</button><button class="danger small" data-reject>Reject</button></li>`).join(""));
+
+  const q = $("filter-live").value, onlyAbsent = $("only-absent").checked;
+  setHTML($("live-list"), state.students.filter(s => match(s, q) && !(onlyAbsent && s.present)).map(s => {
+    const manual = s.method && s.method.startsWith("manual");
+    const status = s.present ? `<span class="pill ok">Here</span> <span class="muted">${fmtTime(s.checkin_ts)}${manual ? ", marked by you" : ""}</span>`
+                             : `<span class="pill bad">Not here</span>`;
+    const flags = (s.flags || []).map(f => `<div class="flagtext">${esc(f)}</div>`).join("");
+    return `<tr data-id="${esc(s.student_id)}"><td>${esc(s.name)}${flags}</td><td class="hide-sm">${esc(s.student_id)}</td><td>${status}</td>
+      <td class="act"><button class="secondary small" data-mark="${s.present ? 0 : 1}">${s.present ? "Mark not here" : "Mark here"}</button></td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="muted">${onlyAbsent ? "Everyone is checked in." : "No student matches."}</td></tr>`);
+
+  const REASON = { ok: "Checked in", enroll: "Checked in, face saved", no_gesture: "No hand sign seen", wrong_gesture: "Wrong sign",
+    no_face: "No face seen", face_mismatch: "Face didn't match", challenge_expired: "Too slow", stale_photo: "Old photo" };
+  setHTML($("attempts"), (state.recent_attempts || []).map(a => `<tr><td>${fmtTime(a.ts)}</td><td>${esc(a.student_id)}</td>
+    <td><span class="pill ${a.accepted ? "ok" : "bad"}">${esc(REASON[a.reason] || a.reason)}</span></td>
+    <td class="muted">${a.latency_ms ? (a.latency_ms / 1000).toFixed(1) + " s" : ""}</td></tr>`).join("")
+    || `<tr><td class="muted">No tries yet.</td></tr>`);
+}
+
+async function refresh() {
+  try {
+    state = await api(`${BASE}/stats`);
+    renderLive(); if (editing === null) renderRoster();
+    clearTimeout(timer);
+    timer = setTimeout(refresh, state.session && !state.session.ended_at ? 2000 : 15000);
+  } catch (e) { toast(e.message); clearTimeout(timer); timer = setTimeout(refresh, 5000); }
+}
+
+async function act(fn, okMsg) { try { await fn(); if (okMsg) toast(okMsg); await refresh(); } catch (e) { toast(e.message); } }
+
+async function upload(file) {
+  if (!file) return;
+  const fd = new FormData(); fd.append("file", file);
+  try { const j = await api(`${BASE}/roster`, fd); sessionStorage.setItem("msg", `Saved ${j.imported} students. The class list now has ${j.roster}.`); location.reload(); }
+  catch (e) { toast(e.message); }
+}
+$("file").onchange = e => upload(e.target.files[0]);
+const drop = $("drop");
+if (drop) {
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => upload(e.dataTransfer.files[0]));
+}
+
+if ($("roster")) {
+  $("filter").oninput = renderRoster;
+  $("roster").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const tr = b.closest("tr"), id = tr.dataset.id, s = state.students.find(x => x.student_id === id);
+    if (b.dataset.edit !== undefined) { editing = id; renderRoster(); tr.parentElement.querySelector("tr.editing input").focus(); }
+    else if (b.dataset.cancel !== undefined) { editing = null; renderRoster(); }
+    else if (b.dataset.save !== undefined) {
+      const fd = new FormData(); tr.querySelectorAll("input").forEach(i => fd.append(i.name, i.value));
+      act(async () => { await api(`${BASE}/students/${encodeURIComponent(id)}`, fd); editing = null; }, "Saved.");
+    }
+    else if (b.dataset.remove !== undefined) {
+      if (confirm(`Remove ${s.name} (${id}) from this course? Past attendance stays in the Excel files.`))
+        act(() => api(`${BASE}/students/${encodeURIComponent(id)}/remove`, {}), `${s.name} removed.`);
+    }
+    else if (b.dataset.reset !== undefined) {
+      if (confirm(`Delete ${s.name}'s saved face? They'll register again at their next check-in.`))
+        act(() => api(`${BASE}/enrollment/${encodeURIComponent(id)}/reset`, {}), "Face photo deleted.");
+    }
+  };
+  $("roster").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.closest("tr.editing")) e.target.closest("tr").querySelector("[data-save]").click();
+    if (e.key === "Escape") { editing = null; renderRoster(); }
+  });
+  $("add").onsubmit = e => {
+    e.preventDefault();
+    act(async () => { await api(`${BASE}/students`, new FormData(e.target)); e.target.reset(); e.target.student_id.focus(); }, "Student added.");
+  };
+}
+
+$("start").onsubmit = e => { e.preventDefault(); const fd = new FormData(e.target); fd.set("enroll_open", $("enroll").checked);
+  act(() => api(`${BASE}/session/start`, fd)); };
+$("end").onclick = () => { if (confirm("End this class? The QR code stops working.")) act(() => api(`${BASE}/session/end`, {}), "Class ended."); };
+$("toggle-enroll").onclick = () => act(() => api(`${BASE}/session/enroll`, { open: !state.session.enroll_open }));
+$("selftest").onclick = async () => {
+  try { const s = await api(`${BASE}/board/state`); if (s.active) window.open(`/q/${s.session_id}/${s.token}`, "_blank"); }
+  catch (e) { toast(e.message); }
+};
+$("filter-live").oninput = renderLive; $("only-absent").onchange = renderLive;
+$("approve-list").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const id = b.closest("li").dataset.id;
+  if (b.dataset.approve !== undefined) act(() => api(`${BASE}/enrollment/${encodeURIComponent(id)}/confirm`, {}));
+  else if (confirm("Reject this face photo? The student is marked not here and registers again next time."))
+    act(() => api(`${BASE}/enrollment/${encodeURIComponent(id)}/reject`, {}));
+};
+$("live-list").onclick = e => {
+  const b = e.target.closest("button[data-mark]"); if (!b) return;
+  act(() => api(`${BASE}/attendance/${encodeURIComponent(b.closest("tr").dataset.id)}`,
+                { present: b.dataset.mark === "1", session_id: state.session.id }));
+};
+$("del").onsubmit = async e => {
+  e.preventDefault();
+  if (!confirm("Delete this course and everything in it? This can't be undone.")) return;
+  try { await api(`${BASE}/delete`, new FormData(e.target)); location.href = "/"; } catch (err) { toast(err.message); }
+};
+
+try { const m = sessionStorage.getItem("msg"); if (m) { sessionStorage.removeItem("msg"); toast(m); } } catch (e) {}
+refresh();
+</script>
+{% endblock %}

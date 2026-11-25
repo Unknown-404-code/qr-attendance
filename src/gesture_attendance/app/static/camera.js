@@ -30,6 +30,20 @@ const SelfieCamera = {
     return new Promise(res => c.toBlob(res, "image/jpeg", quality));
   },
 
+  // Shrink a photo to at most `maxSide` px on the long side (JPEG). Keeps uploads small on slow phone data.
+  // If the browser can't read the file (for example HEIC on some phones), send it as is: the server explains.
+  async shrink(blob, maxSide = 1280, quality = 0.85) {
+    let bmp;
+    try { bmp = await createImageBitmap(blob, { imageOrientation: "from-image" }); } catch (e) { return blob; }
+    const s = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    if (s === 1 && blob.type === "image/jpeg" && blob.size < 1.5e6) { bmp.close && bmp.close(); return blob; }
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close && bmp.close();
+    return new Promise(res => c.toBlob(b => res(b || blob), "image/jpeg", quality));
+  },
+
   stop() {
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
     this.stream = null; this.live = false;

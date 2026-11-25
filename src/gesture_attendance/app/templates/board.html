@@ -1,43 +1,55 @@
 {% extends "_base.html" %}
-{% block title %}Attendance board{% endblock %}
+{% block title %}QR code · {{ course.name }}{% endblock %}
 {% block head %}
 <style>
   body { background:#fff; }
-  .wrap { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
-  #qr { width:min(70vh, 90vw); height:min(70vh, 90vw); image-rendering:pixelated; }
-  #title { font-size:1.6rem; font-weight:600; }
-  #count { font-size:2.4rem; font-weight:700; }
-  .bar { width:min(70vh, 90vw); height:6px; background:#e7ebf0; border-radius:3px; overflow:hidden; }
+  header.top { display:none; }
+  .wrap { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:16px; text-align:center; }
+  #course { font-size:1.2rem; color:var(--muted); }
+  #headline { font-size:clamp(1.8rem, 4.5vh, 3rem); font-weight:800; margin:0; }
+  #qr { width:min(66vh, 90vw); height:min(66vh, 90vw); image-rendering:pixelated; }
+  .bar { width:min(66vh, 90vw); height:8px; background:#e7ebf0; border-radius:4px; overflow:hidden; }
   #fill { height:100%; background:var(--accent); width:100%; transition:width .45s linear; }
-  #idle { font-size:1.4rem; color:var(--muted); display:none; }
+  #count { font-size:clamp(1.4rem, 3.5vh, 2.2rem); font-weight:700; }
+  #enroll { color:var(--muted); font-size:1.1rem; }
+  #idle { font-size:1.4rem; color:var(--muted); }
+  .corner { position:fixed; top:12px; right:12px; display:flex; gap:8px; }
+  .corner button { min-height:36px; padding:6px 12px; font-size:.9rem; }
 </style>
 {% endblock %}
 {% block body %}
+<div class="corner"><button class="secondary" id="fs">Full screen</button></div>
 <div class="wrap">
-  <div id="title"></div>
-  <img id="qr" alt="check-in QR code">
-  <div class="bar"><div id="fill"></div></div>
+  <div id="course">{{ course.name }}</div>
+  <h1 id="headline">Scan to check in</h1>
+  <img id="qr" alt="Check-in QR code" hidden>
+  <div class="bar" id="bar" hidden><div id="fill"></div></div>
   <div id="count"></div>
-  <div class="muted" id="enroll"></div>
-  <div id="idle">No active session — start one from the instructor page.</div>
+  <div id="enroll"></div>
+  <div id="idle" hidden>No class is running. Start one from the course page.</div>
 </div>
+{% endblock %}
+{% block scripts %}
 <script>
+const BASE = "/api/courses/{{ course.id }}", COURSE = {{ course.name|tojson }};
 let lastToken = null;
+const $ = id => document.getElementById(id);
 async function tick() {
   try {
-    const s = await (await fetch("/api/board/state", { credentials: "same-origin" })).json();
-    const active = !!s.active;
-    document.getElementById("idle").style.display = active ? "none" : "block";
-    document.getElementById("qr").style.visibility = active ? "visible" : "hidden";
-    if (active) {
-      if (s.token !== lastToken) { document.getElementById("qr").src = "/api/board/qr.png?t=" + s.token; lastToken = s.token; }
-      document.getElementById("title").textContent = s.title;
-      document.getElementById("count").textContent = `Checked in: ${s.present} / ${s.roster}`;
-      document.getElementById("fill").style.width = (100 * s.seconds_left / s.period) + "%";
-      document.getElementById("enroll").textContent = s.enroll_open ? "First-time enrollment is open" : "";
-    }
+    const s = await api(`${BASE}/board/state`);
+    $("idle").hidden = s.active; $("qr").hidden = !s.active; $("bar").hidden = !s.active;
+    $("headline").textContent = s.active ? "Scan to check in" : "Attendance";
+    if (s.active) {
+      if (s.token !== lastToken) { $("qr").src = `${BASE}/board/qr.png?t=${s.token}`; lastToken = s.token; }
+      $("course").textContent = `${COURSE} · ${s.title}`;
+      $("count").textContent = `${s.present} of ${s.roster} checked in`;
+      $("fill").style.width = (100 * s.seconds_left / s.period) + "%";
+      $("enroll").textContent = s.enroll_open ? "First time? Your face is saved when you check in." : "";
+    } else { $("count").textContent = ""; $("enroll").textContent = ""; }
   } catch (e) { console.warn(e); }
 }
+$("fs").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+document.addEventListener("fullscreenchange", () => { $("fs").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen"; });
 tick(); setInterval(tick, 500);
 </script>
 {% endblock %}
