@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None):
     local = f"http://127.0.0.1:{args.port}"
     phones = cfg["app"]["base_url"] or "(the address phones open, taken from each request)"
     print("\n" + "=" * 72)
-    print(f"  Sign in             : {local}/login")
+    print(f"  Sign in              : {local}/login")
     if app.state.generated_admin_password:
         print(f"  First admin account  : admin@localhost / {app.state.generated_admin_password}")
     print(f"  Phones will open     : {phones}   (encoded in the QR code)")

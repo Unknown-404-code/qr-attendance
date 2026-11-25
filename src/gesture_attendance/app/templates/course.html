@@ -12,7 +12,9 @@
   details.card > summary::after { content:"Show"; margin-left:auto; color:var(--accent); font-size:.92rem; }
   details.card[open] > summary::after { content:"Hide"; }
   details.card[open] > summary { margin-bottom:14px; }
-  .drop { border:2px dashed #c3cdd8; border-radius:var(--radius); padding:22px; text-align:center; background:#fafbfc; }
+  .drop { display:block; cursor:pointer; border:2px dashed #c3cdd8; border-radius:var(--radius); padding:22px;
+          text-align:center; background:#fafbfc; }
+  .drop:hover { border-color:var(--accent); }
   .drop.over { border-color:var(--accent); background:var(--accent-soft); }
   .drop input[type=file] { display:none; }
   .live-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
@@ -55,7 +57,7 @@
   </section>
   {% else %}
   <details class="card" id="students-box">
-    <summary><span class="step" style="margin:0"><span class="n">1</span><h2>Students ({{ n_students }})</h2></span></summary>
+    <summary><span class="step" style="margin:0"><span class="n">1</span><h2 id="students-title">Students ({{ n_students }})</h2></span></summary>
     <div class="row" style="margin-bottom:10px">
       <input type="search" class="filter grow" id="filter" placeholder="Find by name or ID" aria-label="Find a student">
       <label class="btn secondary small" for="file" style="cursor:pointer">Upload a new file</label>
@@ -157,6 +159,7 @@ function match(s, q) { q = q.trim().toLowerCase(); return !q || s.name.toLowerCa
 
 function renderRoster() {
   const tb = $("roster"); if (!tb || !state) return;
+  $("students-title").textContent = `Students (${state.students.length})`;
   const q = $("filter").value;
   setHTML(tb, state.students.filter(s => match(s, q)).map(s => {
     const id = esc(s.student_id);
