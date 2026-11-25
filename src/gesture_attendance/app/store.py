@@ -1,165 +1,264 @@
-"""SQLite persistence. Only face EMBEDDINGS are stored - never the selfies."""
+"""Persistence on SQLite (laptop) or Postgres (hosted). Only face EMBEDDINGS are stored - never the selfies.
+
+Everything a doctor sees hangs off a course: students(course_id, student_id), sessions(course_id).
+Challenges, attempts, attendance and flags key on session_id and so inherit the course.
+"""
 from __future__ import annotations
 
-import sqlite3
-import threading
 import time
 from pathlib import Path
 
 import numpy as np
 
+from .db import connect, ddl
+
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users(
+    id {id}, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, role TEXT NOT NULL,
+    password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at {real});
+CREATE TABLE IF NOT EXISTS courses(
+    id {id}, owner_id INTEGER NOT NULL, name TEXT NOT NULL, created_at {real});
 CREATE TABLE IF NOT EXISTS students(
-    student_id TEXT PRIMARY KEY, name TEXT NOT NULL,
-    embedding BLOB, enrolled_at REAL, enroll_status TEXT NOT NULL DEFAULT 'none');  -- none|pending|confirmed
+    course_id INTEGER NOT NULL, student_id TEXT NOT NULL, name TEXT NOT NULL,
+    embedding {blob}, enrolled_at {real}, enroll_status TEXT NOT NULL DEFAULT 'none', removed_at {real},
+    PRIMARY KEY(course_id, student_id));
 CREATE TABLE IF NOT EXISTS sessions(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, started_at REAL, ended_at REAL,
+    id {id}, course_id INTEGER NOT NULL, title TEXT, started_at {real}, ended_at {real},
     enroll_open INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS challenges(
-    id TEXT PRIMARY KEY, session_id INTEGER, student_id TEXT, gesture TEXT, created_at REAL,
+    id TEXT PRIMARY KEY, session_id INTEGER, student_id TEXT, gesture TEXT, created_at {real},
     used INTEGER NOT NULL DEFAULT 0, device_id TEXT);
 CREATE TABLE IF NOT EXISTS attempts(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, student_id TEXT, ts REAL, challenge TEXT,
-    pred TEXT, conf REAL, face_sim REAL, accepted INTEGER, reason TEXT, device_id TEXT, source TEXT,
-    latency_ms REAL);
+    id {id}, session_id INTEGER, student_id TEXT, ts {real}, challenge TEXT,
+    pred TEXT, conf {real}, face_sim {real}, accepted INTEGER, reason TEXT, device_id TEXT, source TEXT,
+    latency_ms {real});
 CREATE TABLE IF NOT EXISTS attendance(
-    session_id INTEGER, student_id TEXT, ts REAL, device_id TEXT, face_sim REAL, method TEXT,
+    session_id INTEGER NOT NULL, student_id TEXT NOT NULL, ts {real}, device_id TEXT, face_sim {real}, method TEXT,
     PRIMARY KEY(session_id, student_id));
 CREATE TABLE IF NOT EXISTS flags(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, student_id TEXT, ts REAL, kind TEXT, detail TEXT);
+    id {id}, session_id INTEGER, student_id TEXT, ts {real}, kind TEXT, detail TEXT);
+CREATE INDEX IF NOT EXISTS ix_sessions_course ON sessions(course_id);
+CREATE INDEX IF NOT EXISTS ix_attempts_session ON attempts(session_id, student_id);
+CREATE INDEX IF NOT EXISTS ix_flags_session ON flags(session_id)
 """
+
+# tables keyed on session_id whose student_id follows a student's ID change
+SESSION_TABLES = ("challenges", "attempts", "attendance", "flags")
+
+
+def _sid(x) -> str:
+    return str(x).strip()
 
 
 class Store:
-    def __init__(self, path: str | Path = ":memory:"):
-        if str(path) != ":memory:":
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(path), check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
-        self.lock = threading.RLock()
-        with self.lock:
-            self.db.executescript(SCHEMA)
+    def __init__(self, target: str | Path = ":memory:", schema: str | None = None):
+        self.db = connect(target, schema=schema)
+        self.db.script(ddl(SCHEMA, self.db.dialect))
 
-    def _q(self, sql: str, args=()) -> list[sqlite3.Row]:
-        with self.lock:
-            return self.db.execute(sql, args).fetchall()
+    # ------------------------------------------------------------------ users
+    def create_user(self, email: str, name: str, role: str, password_hash: str) -> int:
+        email = email.strip().lower()
+        with self.db.lock:
+            if self.user_by_email(email):
+                raise ValueError("An account with this email already exists.")
+            return self.db.insert("INSERT INTO users(email, name, role, password_hash, active, created_at) "
+                                  "VALUES(?, ?, ?, ?, 1, ?) RETURNING id",
+                                  (email, name.strip(), role, password_hash, time.time()))
 
-    def _x(self, sql: str, args=()) -> int:
-        with self.lock:
-            cur = self.db.execute(sql, args)
-            self.db.commit()
-            return cur.lastrowid
+    def user(self, uid: int) -> dict | None:
+        return self.db.one("SELECT * FROM users WHERE id=?", (uid,))
 
-    # ------------------------------------------------------------------ roster
-    def upsert_students(self, rows: list[tuple[str, str]]) -> int:
-        with self.lock:
+    def user_by_email(self, email: str) -> dict | None:
+        return self.db.one("SELECT * FROM users WHERE email=?", (email.strip().lower(),))
+
+    def users(self) -> list[dict]:
+        return self.db.q("SELECT id, email, name, role, active, created_at FROM users ORDER BY lower(name)")
+
+    def set_password(self, uid: int, password_hash: str):
+        self.db.x("UPDATE users SET password_hash=? WHERE id=?", (password_hash, uid))
+
+    def set_active(self, uid: int, active: bool):
+        self.db.x("UPDATE users SET active=? WHERE id=?", (int(active), uid))
+
+    def count_admins(self) -> int:
+        return int(self.db.one("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1")["n"])
+
+    # ------------------------------------------------------------------ courses
+    def create_course(self, owner_id: int, name: str) -> int:
+        return self.db.insert("INSERT INTO courses(owner_id, name, created_at) VALUES(?, ?, ?) RETURNING id",
+                              (owner_id, name.strip(), time.time()))
+
+    def course(self, cid: int) -> dict | None:
+        return self.db.one("SELECT * FROM courses WHERE id=?", (cid,))
+
+    def courses(self, owner_id: int | None) -> list[dict]:
+        if owner_id is None:
+            return self.db.q("SELECT * FROM courses ORDER BY id")
+        return self.db.q("SELECT * FROM courses WHERE owner_id=? ORDER BY id", (owner_id,))
+
+    def delete_course(self, cid: int):
+        with self.db.lock:
+            for t in SESSION_TABLES:
+                self.db.x(f"DELETE FROM {t} WHERE session_id IN (SELECT id FROM sessions WHERE course_id=?)", (cid,))
+            self.db.x("DELETE FROM sessions WHERE course_id=?", (cid,))
+            self.db.x("DELETE FROM students WHERE course_id=?", (cid,))
+            self.db.x("DELETE FROM courses WHERE id=?", (cid,))
+
+    # ------------------------------------------------------------------ students
+    def upsert_students(self, cid: int, rows: list[tuple[str, str]]) -> int:
+        """Adds new students, updates names, and brings back removed students who are in the file."""
+        with self.db.lock:
             for sid, name in rows:
-                self.db.execute("INSERT INTO students(student_id, name) VALUES(?, ?) "
-                                "ON CONFLICT(student_id) DO UPDATE SET name=excluded.name", (sid, name))
-            self.db.commit()
+                self.db.x("INSERT INTO students(course_id, student_id, name) VALUES(?, ?, ?) "
+                          "ON CONFLICT(course_id, student_id) DO UPDATE SET name=excluded.name, removed_at=NULL",
+                          (cid, _sid(sid), str(name).strip()))
         return len(rows)
 
-    def students(self) -> list[dict]:
-        return [dict(r) for r in self._q("SELECT student_id, name, enroll_status, enrolled_at FROM students "
-                                         "ORDER BY name COLLATE NOCASE")]
+    def students(self, cid: int, include_removed: bool = False) -> list[dict]:
+        where = "" if include_removed else " AND removed_at IS NULL"
+        return self.db.q("SELECT student_id, name, enroll_status, enrolled_at, removed_at FROM students "
+                         f"WHERE course_id=?{where} ORDER BY lower(name), student_id", (cid,))
 
-    def student(self, sid: str) -> dict | None:
-        r = self._q("SELECT * FROM students WHERE student_id=?", (sid,))
-        return dict(r[0]) if r else None
+    def student(self, cid: int, sid: str) -> dict | None:
+        return self.db.one("SELECT * FROM students WHERE course_id=? AND student_id=? AND removed_at IS NULL",
+                           (cid, _sid(sid)))
 
-    def embedding(self, sid: str) -> np.ndarray | None:
-        r = self._q("SELECT embedding FROM students WHERE student_id=?", (sid,))
-        return None if not r or r[0]["embedding"] is None else np.frombuffer(r[0]["embedding"], dtype=np.float32).copy()
+    def _any_student(self, cid: int, sid: str) -> dict | None:
+        return self.db.one("SELECT * FROM students WHERE course_id=? AND student_id=?", (cid, _sid(sid)))
 
-    def all_embeddings(self) -> dict[str, np.ndarray]:
+    def add_student(self, cid: int, sid: str, name: str):
+        sid = _sid(sid)
+        if not sid:
+            raise ValueError("Enter a student ID.")
+        with self.db.lock:
+            if self._any_student(cid, sid):
+                raise ValueError(f"ID {sid} is already in this course.")
+            self.db.x("INSERT INTO students(course_id, student_id, name) VALUES(?, ?, ?)", (cid, sid, name.strip()))
+
+    def update_student(self, cid: int, old_sid: str, new_sid: str, name: str):
+        old, new = _sid(old_sid), _sid(new_sid)
+        if not new:
+            raise ValueError("Enter a student ID.")
+        with self.db.lock:
+            if self._any_student(cid, old) is None:
+                raise ValueError(f"ID {old} is not in this course.")
+            if new != old:
+                if self._any_student(cid, new):
+                    raise ValueError(f"ID {new} is already in this course.")
+                for t in SESSION_TABLES:
+                    self.db.x(f"UPDATE {t} SET student_id=? WHERE student_id=? AND session_id IN "
+                              "(SELECT id FROM sessions WHERE course_id=?)", (new, old, cid))
+            self.db.x("UPDATE students SET student_id=?, name=? WHERE course_id=? AND student_id=?",
+                      (new, name.strip(), cid, old))
+
+    def remove_student(self, cid: int, sid: str):
+        self.db.x("UPDATE students SET removed_at=? WHERE course_id=? AND student_id=?", (time.time(), cid, _sid(sid)))
+
+    def report_students(self, cid: int, session_ids: list[int]) -> list[dict]:
+        """Current students, plus removed ones who attended any of `session_ids`."""
+        rows = self.students(cid, include_removed=True)
+        attended: set[str] = set()
+        for s in session_ids:
+            attended |= set(self.attendance(s))
+        out = []
+        for r in rows:
+            removed = r["removed_at"] is not None
+            if removed and r["student_id"] not in attended:
+                continue
+            out.append({**r, "removed": removed})
+        return out
+
+    def embedding(self, cid: int, sid: str) -> np.ndarray | None:
+        r = self.db.one("SELECT embedding FROM students WHERE course_id=? AND student_id=?", (cid, _sid(sid)))
+        return None if not r or r["embedding"] is None else np.frombuffer(r["embedding"], dtype=np.float32).copy()
+
+    def all_embeddings(self, cid: int) -> dict[str, np.ndarray]:
         return {r["student_id"]: np.frombuffer(r["embedding"], dtype=np.float32)
-                for r in self._q("SELECT student_id, embedding FROM students WHERE embedding IS NOT NULL")}
+                for r in self.db.q("SELECT student_id, embedding FROM students "
+                                   "WHERE course_id=? AND embedding IS NOT NULL AND removed_at IS NULL", (cid,))}
 
-    def set_embedding(self, sid: str, emb: np.ndarray | None, status: str):
+    def set_embedding(self, cid: int, sid: str, emb: np.ndarray | None, status: str):
         blob = None if emb is None else np.asarray(emb, np.float32).tobytes()
-        self._x("UPDATE students SET embedding=?, enrolled_at=?, enroll_status=? WHERE student_id=?",
-                (blob, time.time() if emb is not None else None, status, sid))
+        self.db.x("UPDATE students SET embedding=?, enrolled_at=?, enroll_status=? WHERE course_id=? AND student_id=?",
+                  (blob, time.time() if emb is not None else None, status, cid, _sid(sid)))
 
-    def set_enroll_status(self, sid: str, status: str):
-        self._x("UPDATE students SET enroll_status=? WHERE student_id=?", (status, sid))
+    def set_enroll_status(self, cid: int, sid: str, status: str):
+        self.db.x("UPDATE students SET enroll_status=? WHERE course_id=? AND student_id=?", (status, cid, _sid(sid)))
 
     # ------------------------------------------------------------------ sessions
-    def start_session(self, title: str, enroll_open: bool = False) -> int:
-        with self.lock:
-            self.db.execute("UPDATE sessions SET ended_at=? WHERE ended_at IS NULL", (time.time(),))
-            self.db.commit()
-        return self._x("INSERT INTO sessions(title, started_at, enroll_open) VALUES(?, ?, ?)",
-                       (title, time.time(), int(enroll_open)))
+    def start_session(self, cid: int, title: str, enroll_open: bool = False) -> int:
+        with self.db.lock:
+            self.db.x("UPDATE sessions SET ended_at=? WHERE course_id=? AND ended_at IS NULL", (time.time(), cid))
+            return self.db.insert("INSERT INTO sessions(course_id, title, started_at, enroll_open) "
+                                  "VALUES(?, ?, ?, ?) RETURNING id", (cid, title, time.time(), int(enroll_open)))
 
     def end_session(self, session_id: int):
-        self._x("UPDATE sessions SET ended_at=? WHERE id=? AND ended_at IS NULL", (time.time(), session_id))
+        self.db.x("UPDATE sessions SET ended_at=? WHERE id=? AND ended_at IS NULL", (time.time(), session_id))
 
-    def active_session(self) -> dict | None:
-        r = self._q("SELECT * FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1")
-        return dict(r[0]) if r else None
+    def active_session(self, cid: int) -> dict | None:
+        return self.db.one("SELECT * FROM sessions WHERE course_id=? AND ended_at IS NULL ORDER BY id DESC LIMIT 1",
+                           (cid,))
 
     def session(self, session_id: int) -> dict | None:
-        r = self._q("SELECT * FROM sessions WHERE id=?", (session_id,))
-        return dict(r[0]) if r else None
+        return self.db.one("SELECT * FROM sessions WHERE id=?", (session_id,))
 
-    def sessions(self) -> list[dict]:
-        return [dict(r) for r in self._q("SELECT * FROM sessions ORDER BY id DESC")]
+    def sessions(self, cid: int) -> list[dict]:
+        return self.db.q("SELECT * FROM sessions WHERE course_id=? ORDER BY id DESC", (cid,))
 
     def set_enroll_open(self, session_id: int, open_: bool):
-        self._x("UPDATE sessions SET enroll_open=? WHERE id=?", (int(open_), session_id))
+        self.db.x("UPDATE sessions SET enroll_open=? WHERE id=?", (int(open_), session_id))
 
     # ------------------------------------------------------------------ challenges / attempts
     def add_challenge(self, cid: str, session_id: int, sid: str, gesture: str, device_id: str):
-        self._x("INSERT INTO challenges(id, session_id, student_id, gesture, created_at, device_id) "
-                "VALUES(?, ?, ?, ?, ?, ?)", (cid, session_id, sid, gesture, time.time(), device_id))
+        self.db.x("INSERT INTO challenges(id, session_id, student_id, gesture, created_at, device_id) "
+                  "VALUES(?, ?, ?, ?, ?, ?)", (cid, session_id, sid, gesture, time.time(), device_id))
 
     def take_challenge(self, cid: str) -> dict | None:
         """Atomically mark a challenge used (one selfie per challenge) and return it."""
-        with self.lock:
-            r = self.db.execute("SELECT * FROM challenges WHERE id=? AND used=0", (cid,)).fetchone()
-            if r is None:
-                return None
-            self.db.execute("UPDATE challenges SET used=1 WHERE id=?", (cid,))
-            self.db.commit()
-            return dict(r)
+        return self.db.one("UPDATE challenges SET used=1 WHERE id=? AND used=0 RETURNING *", (cid,))
 
     def add_attempt(self, **kw) -> int:
         cols = ",".join(kw)
-        return self._x(f"INSERT INTO attempts({cols}) VALUES({','.join('?' * len(kw))})", tuple(kw.values()))
+        return self.db.insert(f"INSERT INTO attempts({cols}) VALUES({','.join('?' * len(kw))}) RETURNING id",
+                              tuple(kw.values()))
 
     def n_attempts(self, session_id: int, sid: str) -> int:
-        return self._q("SELECT COUNT(*) n FROM attempts WHERE session_id=? AND student_id=?", (session_id, sid))[0]["n"]
+        return int(self.db.one("SELECT COUNT(*) AS n FROM attempts WHERE session_id=? AND student_id=?",
+                               (session_id, sid))["n"])
 
     def attempts(self, session_id: int) -> list[dict]:
-        return [dict(r) for r in self._q("SELECT * FROM attempts WHERE session_id=? ORDER BY ts", (session_id,))]
+        return self.db.q("SELECT * FROM attempts WHERE session_id=? ORDER BY ts", (session_id,))
 
     # ------------------------------------------------------------------ attendance
     def mark_present(self, session_id: int, sid: str, device_id: str = "", face_sim: float | None = None,
                      method: str = "gesture+face"):
-        self._x("INSERT OR REPLACE INTO attendance(session_id, student_id, ts, device_id, face_sim, method) "
-                "VALUES(?, ?, ?, ?, ?, ?)", (session_id, sid, time.time(), device_id, face_sim, method))
+        self.db.x("INSERT INTO attendance(session_id, student_id, ts, device_id, face_sim, method) "
+                  "VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(session_id, student_id) DO UPDATE SET "
+                  "ts=excluded.ts, device_id=excluded.device_id, face_sim=excluded.face_sim, method=excluded.method",
+                  (session_id, sid, time.time(), device_id, face_sim, method))
 
     def unmark(self, session_id: int, sid: str):
-        self._x("DELETE FROM attendance WHERE session_id=? AND student_id=?", (session_id, sid))
+        self.db.x("DELETE FROM attendance WHERE session_id=? AND student_id=?", (session_id, sid))
 
     def is_present(self, session_id: int, sid: str) -> bool:
-        return bool(self._q("SELECT 1 FROM attendance WHERE session_id=? AND student_id=?", (session_id, sid)))
+        return self.db.one("SELECT 1 AS x FROM attendance WHERE session_id=? AND student_id=?", (session_id, sid)) is not None
 
     def attendance(self, session_id: int) -> dict[str, dict]:
-        return {r["student_id"]: dict(r) for r in self._q("SELECT * FROM attendance WHERE session_id=?", (session_id,))}
+        return {r["student_id"]: r for r in self.db.q("SELECT * FROM attendance WHERE session_id=?", (session_id,))}
 
     def students_on_device(self, session_id: int, device_id: str) -> set[str]:
-        rows = self._q("SELECT DISTINCT student_id FROM challenges WHERE session_id=? AND device_id=?",
-                       (session_id, device_id))
+        rows = self.db.q("SELECT DISTINCT student_id FROM challenges WHERE session_id=? AND device_id=?",
+                         (session_id, device_id))
         return {r["student_id"] for r in rows}
 
     # ------------------------------------------------------------------ flags
     def flag(self, session_id: int, sid: str, kind: str, detail: str = ""):
-        exists = self._q("SELECT 1 FROM flags WHERE session_id=? AND student_id=? AND kind=? AND detail=?",
-                         (session_id, sid, kind, detail))
-        if not exists:
-            self._x("INSERT INTO flags(session_id, student_id, ts, kind, detail) VALUES(?, ?, ?, ?, ?)",
-                    (session_id, sid, time.time(), kind, detail))
+        with self.db.lock:
+            exists = self.db.one("SELECT 1 AS x FROM flags WHERE session_id=? AND student_id=? AND kind=? AND detail=?",
+                                 (session_id, sid, kind, detail))
+            if not exists:
+                self.db.x("INSERT INTO flags(session_id, student_id, ts, kind, detail) VALUES(?, ?, ?, ?, ?)",
+                          (session_id, sid, time.time(), kind, detail))
 
     def flags(self, session_id: int) -> list[dict]:
-        return [dict(r) for r in self._q("SELECT * FROM flags WHERE session_id=? ORDER BY ts", (session_id,))]
+        return self.db.q("SELECT * FROM flags WHERE session_id=? ORDER BY ts, id", (session_id,))
