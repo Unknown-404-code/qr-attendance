@@ -2,27 +2,30 @@
 {% block title %}QR code · {{ course.name }}{% endblock %}
 {% block head %}
 <style>
-  body { background:#fff; }
+  body { background:var(--board); color:var(--chalk); }
   header.top { display:none; }
-  .wrap { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:16px; text-align:center; }
-  #course { font-size:1.2rem; color:var(--muted); }
-  #headline { font-size:clamp(1.8rem, 4.5vh, 3rem); font-weight:800; margin:0; }
-  #qr { width:min(66vh, 90vw); height:min(66vh, 90vw); image-rendering:pixelated; }
-  .bar { width:min(66vh, 90vw); height:8px; background:#e7ebf0; border-radius:4px; overflow:hidden; }
-  #fill { height:100%; background:var(--accent); width:100%; transition:width .45s linear; }
-  #count { font-size:clamp(1.4rem, 3.5vh, 2.2rem); font-weight:700; }
-  #enroll { color:var(--muted); font-size:1.1rem; }
-  #idle { font-size:1.4rem; color:var(--muted); }
-  .corner { position:fixed; top:12px; right:12px; display:flex; gap:8px; }
-  .corner button { min-height:36px; padding:6px 12px; font-size:.9rem; }
+  .chalk-page { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+                padding:16px; text-align:center; border:10px solid #2C4A3A; }
+  #course { font-size:1.2rem; color:var(--chalk-dim); }
+  #headline { font-size:clamp(1.8rem, 4.5vh, 3rem); font-weight:800; margin:0; color:var(--chalk-yellow); }
+  #qr-card { background:#fff; padding:16px; border-radius:14px; line-height:0; }
+  #qr { width:min(60vh, 84vw); height:min(60vh, 84vw); image-rendering:pixelated; }
+  .bar { width:min(60vh, 84vw); height:8px; background:#2C4A3A; border-radius:4px; overflow:hidden; }
+  #fill { height:100%; background:var(--chalk-yellow); width:100%; transition:width .45s linear; }
+  #count { font-size:clamp(1.4rem, 3.5vh, 2.2rem); font-weight:700; color:var(--chalk); }
+  #enroll { color:var(--chalk-dim); font-size:1.1rem; }
+  #idle { font-size:1.4rem; color:var(--chalk-dim); }
+  .corner { position:fixed; top:18px; right:18px; display:flex; gap:8px; }
+  .corner button { min-height:36px; padding:6px 12px; font-size:.9rem; background:transparent; color:var(--chalk); border-color:#6F8A79; }
+  .corner button:hover { background:var(--board-hover); border-color:var(--chalk); }
 </style>
 {% endblock %}
 {% block body %}
 <div class="corner"><button class="secondary" id="fs">Full screen</button></div>
-<div class="wrap">
+<div class="chalk-page">
   <div id="course">{{ course.name }}</div>
   <h1 id="headline">Scan to check in</h1>
-  <img id="qr" alt="Check-in QR code" hidden>
+  <div id="qr-card" hidden><img id="qr" alt="Check-in QR code"></div>
   <div class="bar" id="bar" hidden><div id="fill"></div></div>
   <div id="count"></div>
   <div id="enroll"></div>
@@ -37,7 +40,7 @@ const $ = id => document.getElementById(id);
 async function tick() {
   try {
     const s = await api(`${BASE}/board/state`);
-    $("idle").hidden = s.active; $("qr").hidden = !s.active; $("bar").hidden = !s.active;
+    $("idle").hidden = s.active; $("qr-card").hidden = !s.active; $("bar").hidden = !s.active;
     $("headline").textContent = s.active ? "Scan to check in" : "Attendance";
     if (s.active) {
       if (s.token !== lastToken) { $("qr").src = `${BASE}/board/qr.png?t=${s.token}`; lastToken = s.token; }

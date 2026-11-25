@@ -90,3 +90,17 @@ def test_home_running_tag(tmp_path):
 
 def test_login_board_hero(tmp_path):
     assert 'class="board login-hero"' in TestClient(make_app(tmp_path)).get("/login").text
+
+
+def test_qr_board_chalk(tmp_path):
+    app, dr, c = doctor_course(tmp_path)
+    html = dr.get(f"/courses/{c.cid}/board").text
+    assert 'class="chalk-page"' in html and 'id="qr-card"' in html
+
+
+def test_checkin_board_header(tmp_path):
+    from test_app import phone
+    app, dr, c = doctor_course(tmp_path)
+    c.post("/session/start", data={"title": "Week 2"})
+    html = phone(app, c.session_id()).get("/checkin").text
+    assert re.search(r'class="board checkin-head"[^>]*>.*?CV', html, re.S)

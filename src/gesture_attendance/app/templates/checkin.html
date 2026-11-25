@@ -6,9 +6,12 @@
   main { max-width:520px; padding-top:16px; }
   .steps { display:flex; gap:6px; margin:0 0 16px; list-style:none; padding:0; }
   .steps li { flex:1; text-align:center; font-size:.85rem; color:var(--muted); padding-top:8px; border-top:4px solid var(--line); }
-  .steps li.on { color:var(--accent); border-color:var(--accent); font-weight:700; }
+  .steps li.on { color:var(--board); border-color:var(--chalk-yellow); font-weight:700; }
   .steps li.done { color:var(--ok); border-color:var(--ok); }
-  .sign { text-align:center; margin:4px 0 12px; }
+  .checkin-head { padding:16px 18px; margin:0 0 14px; }
+  .checkin-head h1 { margin:2px 0 0; color:var(--chalk-yellow); }
+  .sign { text-align:center; margin:4px 0 12px; padding:14px; }
+  .sign .name { color:var(--chalk-yellow); }
   .sign .emoji { font-size:5rem; line-height:1.1; }
   .sign .name { font-size:1.5rem; font-weight:800; }
   .videobox { position:relative; width:100%; aspect-ratio:3/4; background:#0b0f14; border-radius:var(--radius); overflow:hidden; }
@@ -23,8 +26,10 @@
 {% endblock %}
 {% block body %}
 <main>
-  <p class="muted" style="margin:0">{{ course }}</p>
-  <h1>{{ title }}</h1>
+  <div class="board checkin-head">
+    <div class="muted">{{ course }}</div>
+    <h1>{{ title }}</h1>
+  </div>
   <ol class="steps" aria-label="Progress">
     <li id="s1" class="on">1. Your ID</li><li id="s2">2. Hand sign</li><li id="s3">3. Done</li>
   </ol>
@@ -38,7 +43,7 @@
 
   <div class="card" id="step-gesture" hidden>
     <p class="who" id="who"></p>
-    <div class="sign"><div class="muted">Hold this sign next to your face</div>
+    <div class="sign board"><div class="muted">Hold this sign next to your face</div>
       <div class="emoji" id="emoji"></div><div class="name" id="gname"></div></div>
     <div class="videobox" id="vbox"><video id="video" playsinline muted></video>
       <div class="hint">Your face and your hand both in the picture</div></div>
