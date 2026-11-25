@@ -17,3 +17,7 @@ def flag_text(kind: str, detail: str = "") -> str:
         ids = detail.rsplit(" for ", 1)[-1]
         text += f" ({ids})"
     return text
+
+LOGIN_WRONG = "Email or password is wrong."
+LOGIN_BLOCKED = "Too many tries. Wait 15 minutes and try again."
+CURRENT_PASSWORD_WRONG = "Your current password is wrong."

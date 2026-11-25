@@ -1,0 +1,28 @@
+{% extends "_base.html" %}
+{% block title %}Sign in · Attendance{% endblock %}
+{% block head %}
+<style>
+  .login { max-width:400px; margin:9vh auto 0; padding:0 16px; }
+  .login h1 { margin-bottom:6px; }
+  .error { background:var(--badbg); color:var(--bad); }
+</style>
+{% endblock %}
+{% block body %}
+<main class="login">
+  <h1>Sign in</h1>
+  <p class="lead">Take attendance with a rotating QR code and a quick selfie.</p>
+  <form class="card stack" method="post" action="/login">
+    {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+    <div>
+      <label class="field" for="email">Email</label>
+      <input type="email" id="email" name="email" value="{{ email }}" autocomplete="username" required autofocus>
+    </div>
+    <div>
+      <label class="field" for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button class="big" type="submit">Sign in</button>
+  </form>
+  <p class="muted">No account? Ask your admin to make one for you.</p>
+</main>
+{% endblock %}

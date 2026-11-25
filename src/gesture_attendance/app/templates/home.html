@@ -1,0 +1,8 @@
+{% extends "_base.html" %}
+{% block title %}Your courses · Attendance{% endblock %}
+{% block body %}
+<main>
+  <h1>Your courses</h1>
+  <ul>{% for c in courses %}<li><a href="/courses/{{ c.id }}">{{ c.name }}</a></li>{% endfor %}</ul>
+</main>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "_base.html" %}
+{% block title %}Password · Attendance{% endblock %}
+{% block body %}
+<main style="max-width:520px">
+  <h1>Change your password</h1>
+  <p class="lead">Signed in as {{ user.email }}.</p>
+  <form class="card stack" id="pw">
+    <div>
+      <label class="field" for="current">Current password</label>
+      <input type="password" id="current" name="current" autocomplete="current-password" required>
+    </div>
+    <div>
+      <label class="field" for="new">New password</label>
+      <input type="password" id="new" name="new" autocomplete="new-password" minlength="8" required>
+      <p class="muted" style="margin:6px 0 0">At least 8 characters.</p>
+    </div>
+    <button type="submit">Save password</button>
+  </form>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("pw").onsubmit = async e => {
+  e.preventDefault();
+  try { await api("/api/account/password", new FormData(e.target)); e.target.reset(); toast("Password saved."); }
+  catch (err) { toast(err.message); }
+};
+</script>
+{% endblock %}
