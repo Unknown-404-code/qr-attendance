@@ -1,5 +1,5 @@
-# Attendance app for Hugging Face Spaces (Docker, free CPU). See DEPLOY.md.
-# Secrets come from the Space settings: DATABASE_URL, GA_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD.
+# Attendance app as one Docker container (Render free plan, Cloud Run or Hugging Face). See DEPLOY.md.
+# Secrets come from the host's environment settings: DATABASE_URL, GA_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD.
 FROM python:3.11-slim
 
 # OpenCV and MediaPipe need these system libraries
@@ -29,4 +29,5 @@ USER user
 RUN python -c "from gesture_attendance.config import load_config; from gesture_attendance.verify import build_verifier; build_verifier(load_config())"
 
 EXPOSE 7860
-CMD ["python", "scripts/run_app.py", "--hosted", "--preload", "--port", "7860"]
+# Hosts like Render and Cloud Run tell the app which port to use in $PORT; 7860 otherwise
+CMD python scripts/run_app.py --hosted --preload --port ${PORT:-7860}

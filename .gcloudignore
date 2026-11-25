@@ -1,0 +1,19 @@
+# Files Google Cloud Build doesn't need (keeps the upload small)
+.git
+.gitignore
+.venv
+venv
+.superpowers
+__pycache__
+*.pyc
+data/
+runs/
+models/
+results/
+report/
+slides/
+notebooks/
+docs/
+tests/
+examples/
+*.egg-info
