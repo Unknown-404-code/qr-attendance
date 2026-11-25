@@ -3,14 +3,21 @@
 {% block head %}
 <style>
   .login { max-width:400px; margin:9vh auto 0; padding:0 16px; }
-  .login h1 { margin-bottom:6px; }
+  .login h1 { margin-bottom:12px; }
+  .login-hero { padding:22px 20px; margin:0 0 18px; }
+  .login-hero .name { font-size:1.6rem; font-weight:800; color:var(--chalk-yellow); display:flex; align-items:center; gap:10px; }
+  .login-hero .name::before { content:""; width:16px; height:16px; border-radius:4px; background:var(--chalk-yellow); }
+  .login-hero p { margin:8px 0 0; color:var(--chalk-dim); }
   .error { background:var(--badbg); color:var(--bad); }
 </style>
 {% endblock %}
 {% block body %}
 <main class="login">
+  <div class="board login-hero">
+    <div class="name">Attendance</div>
+    <p>Students scan a rotating QR code and take a quick selfie with a hand sign.</p>
+  </div>
   <h1>Sign in</h1>
-  <p class="lead">Take attendance with a rotating QR code and a quick selfie.</p>
   <form class="card stack" method="post" action="/login">
     {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
     <div>

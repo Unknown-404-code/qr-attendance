@@ -64,3 +64,29 @@ def test_nav_links(tmp_path):
     assert not courses_link(anon.get("/login").text)
     assert not courses_link(anon.get("/checkin").text)
     assert Course  # shared helper import kept for later theme tests
+
+
+def doctor_course(tmp_path):
+    app = make_app(tmp_path)
+    dr = new_doctor(app)
+    c = Course(dr, dr.post("/api/courses", data={"name": "CV"}).json()["id"])
+    c.post("/roster", files={"file": ("r.csv", b"id,name\n1,Ali\n")})
+    return app, dr, c
+
+
+def test_course_live_panel_is_board(tmp_path):
+    app, dr, c = doctor_course(tmp_path)
+    html = dr.get(f"/courses/{c.cid}").text
+    assert re.search(r'<section class="[^"]*\bboard\b[^"]*" id="live-box"', html)
+    assert 'class="chalk-num"' in html
+
+
+def test_home_running_tag(tmp_path):
+    app, dr, c = doctor_course(tmp_path)
+    c.post("/session/start", data={})
+    html = dr.get("/").text
+    assert 'class="live-tag"' in html and "Class running" in html
+
+
+def test_login_board_hero(tmp_path):
+    assert 'class="board login-hero"' in TestClient(make_app(tmp_path)).get("/login").text

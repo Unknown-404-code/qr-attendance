@@ -4,8 +4,7 @@
 <style>
   .back { display:inline-block; margin-bottom:8px; text-decoration:none; font-size:.95rem; }
   .step { display:flex; gap:12px; align-items:baseline; margin:0 0 12px; }
-  .step .n { flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent);
-             font-weight:700; display:inline-flex; align-items:center; justify-content:center; font-size:.95rem; }
+  .step .chalk-num { align-self:center; }
   .step h2 { margin:0; }
   details.card > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:12px; }
   details.card > summary::-webkit-details-marker { display:none; }
@@ -19,11 +18,18 @@
   .drop input[type=file] { display:none; }
   .live-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
   .live-head h2 { margin:0; }
-  .count { font-size:2.8rem; font-weight:800; line-height:1; }
-  .count small { font-size:1.1rem; font-weight:600; color:var(--muted); }
+  #live-box { padding:22px; }
+  .count { font-size:3rem; font-weight:800; line-height:1; color:var(--chalk-yellow); }
+  .count small { font-size:1.1rem; font-weight:600; color:var(--chalk); }
+  .sheet { background:var(--card); color:var(--ink); border-radius:10px; padding:14px; margin-top:18px; }
+  .sheet .muted { color:var(--muted); }
+  #live-box h2 { font-size:1.3rem; }
   .bigbtn { font-size:1.15rem; padding:14px 24px; }
   .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0 4px; }
-  .approve { background:var(--warnbg); border:1px solid #f0d58a; border-radius:10px; padding:12px 14px; margin:14px 0 0; }
+  .approve { background:var(--warnbg); color:var(--warn); border:1px solid #F0D58A; border-radius:10px; padding:12px 14px; margin:14px 0 0; }
+  .approve .muted { color:var(--warn); }
+  .approve li b { color:var(--ink); }
+  .approve li b .muted { color:var(--muted); }
   .approve ul { margin:8px 0 0; padding:0; list-style:none; }
   .approve li { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:4px 0; }
   .approve li b { margin-right:auto; }
@@ -47,7 +53,7 @@
   <!-- 1. Students -->
   {% if n_students == 0 %}
   <section class="card" id="students-empty">
-    <div class="step"><span class="n">1</span><h2>Add your students</h2></div>
+    <div class="step"><span class="chalk-num">1</span><h2>Add your students</h2></div>
     <p class="muted" style="margin-top:0">Upload the class list once. It stays for the whole semester, and you can edit it any time.</p>
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".csv,.xlsx">
@@ -57,7 +63,7 @@
   </section>
   {% else %}
   <details class="card" id="students-box">
-    <summary><span class="step" style="margin:0"><span class="n">1</span><h2 id="students-title">Students ({{ n_students }})</h2></span></summary>
+    <summary><span class="step" style="margin:0"><span class="chalk-num">1</span><h2 id="students-title">Students ({{ n_students }})</h2></span></summary>
     <div class="row" style="margin-bottom:10px">
       <input type="search" class="filter grow" id="filter" placeholder="Find by name or ID" aria-label="Find a student">
       <label class="btn secondary small" for="file" style="cursor:pointer">Upload a new file</label>
@@ -79,7 +85,7 @@
 
   <!-- 2. Start class -->
   <section class="card" id="start-box" hidden>
-    <div class="step"><span class="n">2</span><h2>Start a class</h2></div>
+    <div class="step"><span class="chalk-num">2</span><h2>Start a class</h2></div>
     <form class="stack" id="start">
       <div><label class="field" for="title">Class title <span class="muted">(optional)</span></label>
         <input type="text" id="title" name="title" placeholder="e.g. Week 5 lecture"></div>
@@ -93,9 +99,9 @@
   </section>
 
   <!-- 3. During class -->
-  <section class="card" id="live-box" hidden>
+  <section class="card board" id="live-box" hidden>
     <div class="live-head">
-      <span class="step" style="margin:0"><span class="n">3</span><h2 id="live-title"></h2></span>
+      <span class="step" style="margin:0"><span class="chalk-num">3</span><h2 id="live-title"></h2></span>
     </div>
     <div class="toolbar">
       <a class="btn bigbtn" id="show-qr" target="_blank" href="/courses/{{ course.id }}/board">Show QR code</a>
@@ -109,7 +115,8 @@
       <button class="secondary small" id="toggle-enroll"></button>
       <button class="danger small" id="end">End class</button>
     </div>
-    <div class="row" style="margin:14px 0 8px">
+    <div class="sheet">
+    <div class="row" style="margin:0 0 8px">
       <input type="search" class="filter grow" id="filter-live" placeholder="Find by name or ID" aria-label="Find a student">
       <label class="row" style="gap:6px;font-weight:500"><input type="checkbox" id="only-absent" style="width:18px;height:18px"> Only not checked in</label>
     </div>
@@ -121,11 +128,12 @@
       <p class="muted">Median check time: <span id="lat">-</span></p>
       <div class="table-wrap"><table><tbody id="attempts"></tbody></table></div>
     </details>
+    </div>
   </section>
 
   <!-- 4. After class -->
   <section class="card" id="after-box" hidden>
-    <div class="step"><span class="n">4</span><h2>Attendance files</h2></div>
+    <div class="step"><span class="chalk-num">4</span><h2>Attendance files</h2></div>
     <div class="row" style="margin-bottom:12px">
       <a class="btn secondary" id="dl-last" href="#">Download last class</a>
       <a class="btn secondary" href="/api/courses/{{ course.id }}/course_report.xlsx">Download all classes</a>
