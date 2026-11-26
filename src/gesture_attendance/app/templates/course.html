@@ -100,7 +100,7 @@
       <input type="file" id="file" accept=".csv,.xlsx">
       <span class="up">{{ icon("upload", 26) }}</span>
       <b>Upload a CSV or Excel file</b>
-      <span class="muted">It needs a name column and a student ID column. Click to choose, or drop the file here.</span>
+      <span class="muted">It needs three columns, in this order: Last Name, First Name and Username (the student ID). Click to choose, or drop the file here.</span>
     </label>
   </section>
   {% else %}
@@ -120,7 +120,8 @@
       <input type="text" class="grow" name="name" placeholder="Full name" aria-label="Full name">
       <button class="secondary" type="submit">{{ icon("user-plus", 17) }} Add student</button>
     </form>
-    <p class="muted" style="margin-bottom:0">A new file adds new students and updates names. It never removes anyone.
+    <p class="muted" style="margin-bottom:0">Files need three columns: Last Name, First Name, Username (the student ID).
+      A new file adds new students and updates names. It never removes anyone.
       Removed students stay in the Excel files for classes they attended.</p>
   </details>
   {% endif %}
@@ -131,10 +132,10 @@
       <div><label class="field" for="title">Class title <span class="muted">(optional)</span></label>
         <input type="text" id="title" name="title" placeholder="e.g. Week 5 lecture"></div>
       <label class="row" style="gap:8px; font-weight:600">
-        <input type="checkbox" name="enroll_open" id="enroll" {{ "checked" if anyone_unregistered else "" }} style="width:20px;height:20px">
+        <input type="checkbox" name="enroll_open" id="enroll" style="width:20px;height:20px">
         Let new students register their face
       </label>
-      <p class="muted" style="margin:0">Leave this on for the first class. A student's first check-in saves their face, and you approve it here.</p>
+      <p class="muted" style="margin:0">Tick this for the first class. A student's first check-in saves their face, and you approve it here.</p>
       <div><button class="bigbtn" type="submit" {{ "disabled" if n_students == 0 else "" }}>{{ icon("play", 18) }} Start class</button></div>
     </form>
   </section>

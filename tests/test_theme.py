@@ -128,3 +128,18 @@ def test_course_summary_numbers(tmp_path):
     assert "38%" in html and "Classes held" in html
     home = dr.get("/").text
     assert "4 students" in home and "38%" in home
+
+
+def test_face_registration_unticked_by_default(tmp_path):
+    app, dr, c = doctor_course(tmp_path)   # roster with a student who has no saved face
+    html = dr.get(f"/courses/{c.cid}").text
+    box = re.search(r'<input type="checkbox" name="enroll_open"[^>]*>', html).group(0)
+    assert "checked" not in box
+    assert "Tick this for the first class." in html and "Leave this on" not in html
+    assert "Last Name, First Name and Username" in html or "Last Name, First Name, Username" in html
+
+
+def test_roster_upload_error_names_new_columns(tmp_path):
+    app, dr, c = doctor_course(tmp_path)
+    r = c.post("/roster", files={"file": ("r.csv", b"Foo,Bar\n1,2\n")})
+    assert r.status_code == 400 and "Last Name, First Name, Username" in r.json()["detail"]

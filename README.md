@@ -30,8 +30,8 @@ Each doctor sees only their own courses.
    - The console prints a first admin account (`admin@localhost` and a password) and your browser opens the sign-in
      page. Keep the black console window open during class. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` before the first
      start to choose them yourself.
-3. Sign in, create a course and upload its student list once: a CSV or Excel file with a name column and a
-   student-ID column, like `examples/roster_example.csv`. You can add, edit and remove students later.
+3. Sign in, create a course and upload its student list once: a CSV or Excel file with three columns, Last Name,
+   First Name and Username (the student ID), like `examples/roster_example.csv`. You can add, edit and remove students later.
 4. Start a class. Leave **Let new students register their face** on for the first class. Click **Show QR code** and
    project it. **Try a check-in on this computer** tests it with the laptop webcam.
 5. Students scan the QR code, type their ID, show the hand sign next to their face, and take the photo.
@@ -191,7 +191,7 @@ python scripts/run_app.py --port 8000 --preload --tunnel --open     # what start
 The console prints the sign-in URL. Accounts live in the database: the first admin comes from `ADMIN_EMAIL` /
 `ADMIN_PASSWORD`, or is generated and printed on first start. Admins add doctor accounts on `/admin`.
 
-1. Course page: upload the student list once per course (CSV/Excel with a name and a student-ID column; see
+1. Course page: upload the student list once per course (CSV/Excel with Last Name, First Name and Username columns; see
    `examples/roster_example.csv`), then add, edit or remove students as the semester goes on.
 2. Start a class, with **Let new students register their face** on for the first lecture.
 3. **Show QR code** opens the board. The QR code rotates every 3 s and encodes `/q/<class id>/<token>`.
