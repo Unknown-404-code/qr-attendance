@@ -10,7 +10,7 @@ from fastapi.responses import Response
 
 from .context import AppContext, owned_course, require_user
 from .report import course_report, session_report
-from .roster import parse_roster
+from .roster import FORMAT_ERROR, parse_roster
 from .texts import flag_text
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -67,7 +67,6 @@ def register(app: FastAPI, ctx: AppContext) -> None:
         course = course_summary(owned_course(ctx, user, cid))
         students = store.students(cid)
         return ctx.render(request, "course.html", course=course, n_students=len(students),
-                          anyone_unregistered=any(s["enroll_status"] == "none" for s in students),
                           max_attempts=ctx.cfg["app"]["max_attempts"])
 
     @app.get("/courses/{cid}/board")
@@ -98,7 +97,7 @@ def register(app: FastAPI, ctx: AppContext) -> None:
         try:
             rows = parse_roster(await file.read(), file.filename or "roster.csv")
         except ValueError as e:
-            raise HTTPException(400, "The file needs a name column and a student ID column.") from e
+            raise HTTPException(400, FORMAT_ERROR) from e
         if not rows:
             raise HTTPException(400, "No students found in that file.")
         n = store.upsert_students(course["id"], rows)

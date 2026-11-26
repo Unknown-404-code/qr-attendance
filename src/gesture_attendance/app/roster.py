@@ -1,12 +1,21 @@
-"""Import the instructor's class roster from CSV or Excel (columns: name + student ID, any header spelling)."""
+"""Import the instructor's class roster from CSV or Excel.
+
+Expected layout: three columns, Last Name, First Name, Username. The username is the student ID, and the
+name is stored as "First Last". The older two-column layout (Student ID, Name) still works as a fallback.
+Header spelling is flexible ("last_name", "Surname", "User Name", ...).
+"""
 from __future__ import annotations
 
 import csv
 import io
 import re
 
+LAST_KEYS = ("last name", "lastname", "surname", "family name")
+FIRST_KEYS = ("first name", "firstname", "given name")
+USER_KEYS = ("username", "user name", "user")
 NAME_KEYS = ("name", "student name", "full name", "studentname", "fullname")
 ID_KEYS = ("student id", "student_id", "studentid", "id", "student number", "university id", "uid")
+FORMAT_ERROR = "The file needs three columns: Last Name, First Name, Username (the student ID)."
 
 
 def _norm(h) -> str:
@@ -27,18 +36,27 @@ def _from_table(rows: list[list]) -> list[tuple[str, str]]:
     if not rows:
         return []
     header = [str(c or "") for c in rows[0]]
-    i_name, i_id = _find(header, NAME_KEYS), _find(header, ID_KEYS)
-    if i_name is None or i_id is None:
-        raise ValueError(f"roster needs a name column and a student ID column; got header {header}")
+    cell = lambda r, i: r[i] if i is not None and i < len(r) else None  # noqa: E731
+    text = lambda v: str(v or "").strip()  # noqa: E731
+
+    i_last, i_first, i_user = _find(header, LAST_KEYS), _find(header, FIRST_KEYS), _find(header, USER_KEYS)
+    if None not in (i_last, i_first, i_user):          # Last Name, First Name, Username
+        i_id = i_user
+        name_of = lambda r: " ".join(p for p in (text(cell(r, i_first)), text(cell(r, i_last))) if p)  # noqa: E731
+    else:                                              # older layout: Student ID, Name
+        i_id, i_name = _find(header, ID_KEYS), _find(header, NAME_KEYS)
+        if i_id is None or i_name is None:
+            raise ValueError(FORMAT_ERROR)
+        name_of = lambda r: text(cell(r, i_name))  # noqa: E731
+
     out = []
     for r in rows[1:]:
-        sid = r[i_id] if i_id < len(r) else None
-        name = r[i_name] if i_name < len(r) else None
+        sid = cell(r, i_id)
         if sid is None or str(sid).strip() == "":
             continue
         if isinstance(sid, float) and sid.is_integer():  # Excel stores IDs as numbers
             sid = int(sid)
-        out.append((str(sid).strip(), str(name or "").strip()))
+        out.append((str(sid).strip(), name_of(r)))
     return out
 
 

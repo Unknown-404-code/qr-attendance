@@ -43,3 +43,36 @@ def test_reports():
     wb2 = load_workbook(io.BytesIO(course_report(st, cid)))
     rows2 = {r[0]: r for r in list(wb2.active.iter_rows(values_only=True))[1:]}
     assert rows2["1"][2] == "P" and rows2["3"][1] == "Omar (removed)"
+
+
+def test_parse_last_first_username_csv():
+    data = b"Last Name,First Name,Username\nHassan,Ali,202100001\n Khalid , Sara , 00123 \n"
+    assert parse_roster(data, "r.csv") == [("202100001", "Ali Hassan"), ("00123", "Sara Khalid")]
+
+
+def test_parse_last_first_username_xlsx_numeric_ids():
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Last Name", "First Name", "Username"])
+    ws.append(["Yousef", "Omar", 202100003])
+    ws.append(["Saeed", None, 202100004])          # missing first name: keep what's there
+    buf = io.BytesIO()
+    wb.save(buf)
+    assert parse_roster(buf.getvalue(), "r.xlsx") == [("202100003", "Omar Yousef"), ("202100004", "Saeed")]
+
+
+def test_old_layout_still_works():
+    assert parse_roster(b"Student ID,Name\n1,Ali Hassan\n", "r.csv") == [("1", "Ali Hassan")]
+
+
+def test_unknown_header_names_the_expected_columns():
+    import pytest
+    with pytest.raises(ValueError, match="Last Name, First Name, Username"):
+        parse_roster(b"Surname only,Foo\nx,y\n", "r.csv")
+
+
+def test_example_roster_uses_new_layout():
+    from pathlib import Path
+    data = (Path(__file__).resolve().parents[1] / "examples/roster_example.csv").read_bytes()
+    assert data.decode("utf-8-sig").splitlines()[0] == "Last Name,First Name,Username"
+    assert parse_roster(data, "roster_example.csv")[0] == ("202100001", "Ali Hassan")
